@@ -38,17 +38,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const stored = localStorage.getItem("token");
-    if (!stored) {
-      setLoading(false);
-      return;
-    }
-    api
-      .get<{ id: string; email: string; role: string }>("/auth/me")
-      .then((u) => {
-        setToken(stored);
+    Promise.resolve(stored)
+      .then(async (t) => {
+        if (!t) return;
+        const u = await api.get<{ id: string; email: string; role: string }>("/auth/me");
+        setToken(t);
         setUser({ id: u.id, email: u.email, role: u.role ?? "user" });
       })
-      .catch(() => localStorage.removeItem("token"))
+      .catch(() => { if (stored) localStorage.removeItem("token"); })
       .finally(() => setLoading(false));
   }, []);
 

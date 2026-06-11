@@ -1,6 +1,6 @@
 "use client";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { useTasks } from "@/lib/tasks-hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,13 +18,12 @@ import {
   TableHead,
   TableBody,
   TableRow,
-  TableCell,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TaskRow } from "./TaskRow";
 import { TaskForm } from "./TaskForm";
 import { Pagination } from "./Pagination";
-import { Plus, Search, ClipboardList, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Search, ClipboardList, ArrowUp, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const PAGE_LIMIT = 10;
@@ -49,11 +48,13 @@ export function TasksPageClient() {
   const page = Number(searchParams.get("page") ?? "1");
 
   const [searchInput, setSearchInput] = useState(search);
+  const [prevSearch, setPrevSearch] = useState(search);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
+  if (prevSearch !== search) {
+    setPrevSearch(search);
     setSearchInput(search);
-  }, [search]);
+  }
 
   const updateParams = (updates: Record<string, string | undefined | null>) => {
     const params = new URLSearchParams(searchParams.toString());

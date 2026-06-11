@@ -33,14 +33,12 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
 import {
   CalendarIcon,
   ChevronDown,
   ChevronUp,
   Paperclip,
   X,
-  ArrowRight,
   CheckCircle2,
   Clock,
   Circle,
@@ -52,12 +50,6 @@ type TaskFormProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   task?: Task;
-};
-
-const priorityDot: Record<string, string> = {
-  low: "bg-emerald-500",
-  medium: "bg-amber-500",
-  high: "bg-rose-500",
 };
 
 const statusIcon: Record<string, React.ReactNode> = {
