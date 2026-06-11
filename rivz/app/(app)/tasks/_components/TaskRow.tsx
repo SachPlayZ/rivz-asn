@@ -11,33 +11,36 @@ import { TaskForm } from "./TaskForm";
 const statusConfig = {
   todo: {
     label: "Todo",
-    className: "bg-secondary text-secondary-foreground",
+    className: "bg-muted text-muted-foreground",
   },
   in_progress: {
     label: "In Progress",
-    className: "bg-secondary text-foreground font-medium",
+    className: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
   },
   done: {
     label: "Done",
-    className: "bg-secondary text-muted-foreground line-through",
+    className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
   },
 };
 
 const priorityConfig = {
   low: {
     label: "Low",
-    dot: "bg-muted-foreground/50",
-    text: "text-muted-foreground",
+    dot: "bg-emerald-500",
+    text: "text-emerald-600 dark:text-emerald-400",
+    bg: "bg-emerald-500/8",
   },
   medium: {
     label: "Medium",
-    dot: "bg-foreground/60",
-    text: "text-foreground/80",
+    dot: "bg-amber-500",
+    text: "text-amber-600 dark:text-amber-400",
+    bg: "bg-amber-500/8",
   },
   high: {
     label: "High",
-    dot: "bg-destructive",
-    text: "text-destructive",
+    dot: "bg-rose-500",
+    text: "text-rose-600 dark:text-rose-400",
+    bg: "bg-rose-500/8",
   },
 };
 
@@ -90,7 +93,7 @@ export function TaskRow({ task }: TaskRowProps) {
   return (
     <>
       {/* Desktop row */}
-      <TableRow className="hidden md:table-row group">
+      <TableRow className="hidden md:table-row group transition-colors">
         <TableCell className="w-8">
           <input
             type="checkbox"
@@ -129,7 +132,13 @@ export function TaskRow({ task }: TaskRowProps) {
         </TableCell>
 
         <TableCell className="w-24">
-          <span className={cn("inline-flex items-center gap-1.5 text-xs font-medium", priority.text)}>
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
+              priority.text,
+              priority.bg
+            )}
+          >
             <span className={cn("size-1.5 rounded-full flex-shrink-0", priority.dot)} />
             {priority.label}
           </span>
@@ -141,13 +150,13 @@ export function TaskRow({ task }: TaskRowProps) {
               className={cn(
                 "text-xs",
                 overdue && !isDone
-                  ? "text-destructive font-medium"
+                  ? "text-rose-600 dark:text-rose-400 font-medium"
                   : "text-muted-foreground"
               )}
             >
               {formatDate(task.due_date)}
               {overdue && !isDone && (
-                <span className="ml-1 text-destructive/70">· overdue</span>
+                <span className="ml-1 opacity-70">· overdue</span>
               )}
             </span>
           ) : (
@@ -156,7 +165,7 @@ export function TaskRow({ task }: TaskRowProps) {
         </TableCell>
 
         <TableCell className="w-28 text-right">
-          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
             <Button
               variant="ghost"
               size="icon-sm"
@@ -190,7 +199,7 @@ export function TaskRow({ task }: TaskRowProps) {
                 onClick={() => setConfirmDelete(true)}
                 aria-label="Delete task"
               >
-                <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                <Trash2 className="w-3.5 h-3.5 text-rose-500" />
               </Button>
             )}
           </div>
@@ -198,7 +207,7 @@ export function TaskRow({ task }: TaskRowProps) {
       </TableRow>
 
       {/* Mobile card */}
-      <div className="md:hidden bg-card border border-border rounded-xl p-4 flex flex-col gap-3 shadow-sm">
+      <div className="md:hidden bg-card border border-border rounded-xl p-4 flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow duration-200">
         <div className="flex items-start gap-3">
           <input
             type="checkbox"
@@ -237,7 +246,7 @@ export function TaskRow({ task }: TaskRowProps) {
               onClick={() => setConfirmDelete(true)}
               aria-label="Delete task"
             >
-              <Trash2 className="w-3.5 h-3.5 text-destructive" />
+              <Trash2 className="w-3.5 h-3.5 text-rose-500" />
             </Button>
           </div>
         </div>
@@ -251,7 +260,13 @@ export function TaskRow({ task }: TaskRowProps) {
           >
             {status.label}
           </span>
-          <span className={cn("inline-flex items-center gap-1.5 text-xs font-medium", priority.text)}>
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium",
+              priority.text,
+              priority.bg
+            )}
+          >
             <span className={cn("size-1.5 rounded-full flex-shrink-0", priority.dot)} />
             {priority.label}
           </span>
@@ -259,7 +274,9 @@ export function TaskRow({ task }: TaskRowProps) {
             <span
               className={cn(
                 "text-xs",
-                overdue && !isDone ? "text-destructive font-medium" : "text-muted-foreground"
+                overdue && !isDone
+                  ? "text-rose-600 dark:text-rose-400 font-medium"
+                  : "text-muted-foreground"
               )}
             >
               Due {formatDate(task.due_date)}

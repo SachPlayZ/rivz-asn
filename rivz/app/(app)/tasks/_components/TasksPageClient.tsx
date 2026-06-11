@@ -24,9 +24,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TaskRow } from "./TaskRow";
 import { TaskForm } from "./TaskForm";
 import { Pagination } from "./Pagination";
-import { Plus, Search, ClipboardList, ArrowUpDown } from "lucide-react";
+import { Plus, Search, ClipboardList, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const PAGE_LIMIT = 10;
+
+const statusFilters = [
+  { value: "all", label: "All" },
+  { value: "todo", label: "Todo" },
+  { value: "in_progress", label: "In Progress" },
+  { value: "done", label: "Done" },
+];
 
 export function TasksPageClient() {
   const searchParams = useSearchParams();
@@ -115,32 +123,33 @@ export function TasksPageClient() {
           />
         </div>
 
-        {/* Status filter */}
-        <Select
-          value={status || "all"}
-          onValueChange={(val) =>
-            updateParams({ status: val === "all" ? undefined : val })
-          }
-        >
-          <SelectTrigger className="w-36">
-            <SelectValue placeholder="All statuses" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectGroup>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="todo">Todo</SelectItem>
-              <SelectItem value="in_progress">In Progress</SelectItem>
-              <SelectItem value="done">Done</SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
+        {/* Status filter — pill tabs */}
+        <div className="flex items-center gap-1 rounded-xl bg-muted p-1">
+          {statusFilters.map((f) => {
+            const active = (status || "all") === f.value;
+            return (
+              <button
+                key={f.value}
+                onClick={() => updateParams({ status: f.value === "all" ? undefined : f.value })}
+                className={cn(
+                  "rounded-lg px-2.5 py-1 text-xs font-medium transition-all duration-150",
+                  active
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {f.label}
+              </button>
+            );
+          })}
+        </div>
 
         {/* Sort */}
         <Select
           value={sort}
           onValueChange={(val) => updateParams({ sort: val })}
         >
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-36 text-xs h-7">
             <SelectValue placeholder="Sort by" />
           </SelectTrigger>
           <SelectContent>
@@ -153,9 +162,13 @@ export function TasksPageClient() {
         </Select>
 
         {/* Order toggle */}
-        <Button variant="outline" size="sm" onClick={handleToggleOrder}>
-          <ArrowUpDown className="w-3.5 h-3.5" />
-          {order === "asc" ? "Ascending" : "Descending"}
+        <Button variant="outline" size="sm" onClick={handleToggleOrder} className="h-7 text-xs gap-1">
+          {order === "asc" ? (
+            <ArrowUp className="w-3 h-3" />
+          ) : (
+            <ArrowDown className="w-3 h-3" />
+          )}
+          {order === "asc" ? "Asc" : "Desc"}
         </Button>
       </div>
 
@@ -163,11 +176,11 @@ export function TasksPageClient() {
       {isLoading ? (
         <div className="flex flex-col gap-2">
           {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-14 w-full rounded-lg" />
+            <Skeleton key={i} className="h-14 w-full rounded-xl" />
           ))}
         </div>
       ) : tasks.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+        <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
           <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-muted">
             <ClipboardList className="w-7 h-7 text-muted-foreground" />
           </div>
@@ -196,7 +209,7 @@ export function TasksPageClient() {
                   <TableHead className="w-8" />
                   <TableHead>Title</TableHead>
                   <TableHead className="w-28">Status</TableHead>
-                  <TableHead className="w-24">Priority</TableHead>
+                  <TableHead className="w-28">Priority</TableHead>
                   <TableHead className="w-36">Due Date</TableHead>
                   <TableHead className="w-28" />
                 </TableRow>

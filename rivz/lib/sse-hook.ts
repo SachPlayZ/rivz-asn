@@ -31,6 +31,7 @@ export function useSSE() {
 
       es.onmessage = () => {
         qc.invalidateQueries({ queryKey: ["tasks"] });
+        qc.invalidateQueries({ queryKey: ["activity", "global"] });
       };
 
       es.onerror = () => {

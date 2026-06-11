@@ -3,7 +3,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { ThemeToggle } from "@/app/(app)/_components/ThemeToggle";
-import { LogOut } from "lucide-react";
+import { LogOut, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -37,14 +37,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur-sm">
+      <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur-md">
         <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-          <span className="font-semibold text-sm tracking-tight">
-            TaskFlow <span className="text-muted-foreground font-normal">/ Admin</span>
-          </span>
-
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground hidden sm:block">
+            <span className="font-semibold text-sm tracking-tight">TaskFlow</span>
+            <span className="flex items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+              <ShieldCheck className="size-2.5" />
+              Admin
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs text-muted-foreground hidden sm:block mr-1">
               {user.email}
             </span>
             <div className="flex items-center justify-center w-7 h-7 rounded-full bg-secondary text-secondary-foreground text-xs font-semibold select-none">

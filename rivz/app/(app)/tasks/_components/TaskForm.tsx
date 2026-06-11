@@ -34,7 +34,17 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, ChevronDown, ChevronUp, Paperclip, X } from "lucide-react";
+import {
+  CalendarIcon,
+  ChevronDown,
+  ChevronUp,
+  Paperclip,
+  X,
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  Circle,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -42,6 +52,45 @@ type TaskFormProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   task?: Task;
+};
+
+const priorityDot: Record<string, string> = {
+  low: "bg-emerald-500",
+  medium: "bg-amber-500",
+  high: "bg-rose-500",
+};
+
+const statusIcon: Record<string, React.ReactNode> = {
+  todo: <Circle className="size-3 text-muted-foreground" />,
+  in_progress: <Clock className="size-3 text-blue-500" />,
+  done: <CheckCircle2 className="size-3 text-emerald-500" />,
+};
+
+function formatChanges(changes: Record<string, unknown> | null): string {
+  if (!changes || Object.keys(changes).length === 0) return "";
+  return Object.entries(changes)
+    .map(([key, val]) => {
+      const pair = val as [unknown, unknown];
+      const fmt = (v: unknown) => {
+        if (!v || v === "") return "none";
+        if (typeof v === "string" && v.match(/^\d{4}-\d{2}-\d{2}T/)) {
+          return new Date(v).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+          });
+        }
+        return String(v).replace(/_/g, " ");
+      };
+      return `${key.replace(/_/g, " ")}: ${fmt(pair[0])} → ${fmt(pair[1])}`;
+    })
+    .join(" · ");
+}
+
+const actionBadgeStyle: Record<string, string> = {
+  created: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  updated: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  deleted: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
 };
 
 export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
@@ -77,7 +126,6 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
   const statusValue = watch("status");
   const priorityValue = watch("priority");
 
-  // Attachments (only fetched when section is open and editing).
   const { data: attachments = [], isLoading: attachmentsLoading } = useAttachments(
     task?.id ?? "",
     isEdit && attachmentsOpen
@@ -85,7 +133,6 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
   const uploadAttachment = useUploadAttachment(task?.id ?? "");
   const deleteAttachment = useDeleteAttachment(task?.id ?? "");
 
-  // Activity log (only fetched when section is open and editing).
   const { data: activityLogs = [], isLoading: activityLoading } = useTaskActivity(
     task?.id ?? "",
     isEdit && activityOpen
@@ -133,7 +180,6 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
     } catch {
       toast.error("Upload failed");
     }
-    // Reset input so the same file can be re-uploaded if needed.
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -146,25 +192,6 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
     }
   };
 
-  const actionBadgeVariant = (action: string): "default" | "secondary" | "destructive" | "outline" => {
-    switch (action) {
-      case "created": return "default";
-      case "updated": return "secondary";
-      case "deleted": return "destructive";
-      default: return "outline";
-    }
-  };
-
-  const formatChanges = (changes: Record<string, unknown> | null): string => {
-    if (!changes || Object.keys(changes).length === 0) return "";
-    return Object.entries(changes)
-      .map(([key, val]) => {
-        const pair = val as [unknown, unknown];
-        return `${key}: ${pair[0]} → ${pair[1]}`;
-      })
-      .join(", ");
-  };
-
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); else onOpenChange(true); }}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
@@ -175,7 +202,7 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 mt-1">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="title">
-              Title <span className="text-destructive">*</span>
+              Title <span className="text-rose-500">*</span>
             </Label>
             <Input
               id="title"
@@ -184,7 +211,7 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
               {...register("title")}
             />
             {errors.title && (
-              <p className="text-xs text-destructive">{errors.title.message}</p>
+              <p className="text-xs text-rose-500">{errors.title.message}</p>
             )}
           </div>
 
@@ -210,9 +237,24 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem value="todo">Todo</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="done">Done</SelectItem>
+                    <SelectItem value="todo">
+                      <span className="flex items-center gap-2">
+                        {statusIcon.todo}
+                        Todo
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="in_progress">
+                      <span className="flex items-center gap-2">
+                        {statusIcon.in_progress}
+                        In Progress
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="done">
+                      <span className="flex items-center gap-2">
+                        {statusIcon.done}
+                        Done
+                      </span>
+                    </SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -229,9 +271,24 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
+                    <SelectItem value="low">
+                      <span className="flex items-center gap-2">
+                        <span className="size-2 rounded-full bg-emerald-500" />
+                        Low
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="medium">
+                      <span className="flex items-center gap-2">
+                        <span className="size-2 rounded-full bg-amber-500" />
+                        Medium
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="high">
+                      <span className="flex items-center gap-2">
+                        <span className="size-2 rounded-full bg-rose-500" />
+                        High
+                      </span>
+                    </SelectItem>
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -277,43 +334,45 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
             </div>
           </div>
 
-          {/* Attachments section — only in edit mode */}
+          {/* Attachments — edit mode only */}
           {isEdit && (
-            <div className="flex flex-col gap-2 border rounded-md overflow-hidden">
+            <div className="flex flex-col gap-0 border border-border rounded-xl overflow-hidden">
               <button
                 type="button"
-                className="flex items-center justify-between px-3 py-2 text-sm font-medium bg-muted/50 hover:bg-muted transition-colors w-full text-left"
+                className="flex items-center justify-between px-3 py-2.5 text-sm font-medium hover:bg-muted/50 transition-colors w-full text-left"
                 onClick={() => setAttachmentsOpen((v) => !v)}
               >
                 <span className="flex items-center gap-2">
-                  <Paperclip className="h-3.5 w-3.5" />
+                  <Paperclip className="h-3.5 w-3.5 text-muted-foreground" />
                   Attachments
                   {attachments.length > 0 && (
-                    <Badge variant="secondary" className="text-xs">{attachments.length}</Badge>
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                      {attachments.length}
+                    </span>
                   )}
                 </span>
                 {attachmentsOpen ? (
-                  <ChevronUp className="h-4 w-4" />
+                  <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
                 ) : (
-                  <ChevronDown className="h-4 w-4" />
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                 )}
               </button>
 
               {attachmentsOpen && (
-                <div className="px-3 pb-3 flex flex-col gap-2">
+                <div className="px-3 pb-3 pt-1 flex flex-col gap-2 border-t border-border bg-muted/20">
                   {attachmentsLoading ? (
-                    <p className="text-xs text-muted-foreground">Loading...</p>
+                    <p className="text-xs text-muted-foreground py-1">Loading...</p>
                   ) : attachments.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No attachments yet.</p>
+                    <p className="text-xs text-muted-foreground py-1">No attachments yet.</p>
                   ) : (
-                    <ul className="flex flex-col gap-1">
+                    <ul className="flex flex-col gap-1 mt-1">
                       {attachments.map((att) => (
                         <li key={att.id} className="flex items-center justify-between gap-2 text-sm">
                           <a
                             href={att.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="truncate text-primary hover:underline"
+                            className="truncate text-primary hover:underline text-xs"
                           >
                             {att.filename}
                           </a>
@@ -323,7 +382,7 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
                             size="icon-sm"
                             onClick={() => handleDeleteAttachment(att.id)}
                             aria-label="Delete attachment"
-                            className="shrink-0 text-muted-foreground hover:text-destructive"
+                            className="shrink-0 text-muted-foreground hover:text-rose-500"
                           >
                             <X className="h-3.5 w-3.5" />
                           </Button>
@@ -353,44 +412,49 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
             </div>
           )}
 
-          {/* Activity section — only in edit mode */}
+          {/* Activity — edit mode only */}
           {isEdit && (
-            <div className="flex flex-col gap-2 border rounded-md overflow-hidden">
+            <div className="flex flex-col gap-0 border border-border rounded-xl overflow-hidden">
               <button
                 type="button"
-                className="flex items-center justify-between px-3 py-2 text-sm font-medium bg-muted/50 hover:bg-muted transition-colors w-full text-left"
+                className="flex items-center justify-between px-3 py-2.5 text-sm font-medium hover:bg-muted/50 transition-colors w-full text-left"
                 onClick={() => setActivityOpen((v) => !v)}
               >
-                <span>Activity</span>
+                <span className="text-sm font-medium">Activity</span>
                 {activityOpen ? (
-                  <ChevronUp className="h-4 w-4" />
+                  <ChevronUp className="h-3.5 w-3.5 text-muted-foreground" />
                 ) : (
-                  <ChevronDown className="h-4 w-4" />
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
                 )}
               </button>
 
               {activityOpen && (
-                <div className="px-3 pb-3">
+                <div className="px-3 pb-3 pt-1 border-t border-border bg-muted/20">
                   {activityLoading ? (
-                    <p className="text-xs text-muted-foreground">Loading...</p>
+                    <p className="text-xs text-muted-foreground py-1">Loading...</p>
                   ) : activityLogs.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">No activity yet.</p>
+                    <p className="text-xs text-muted-foreground py-1">No activity yet.</p>
                   ) : (
-                    <ul className="flex flex-col gap-2">
+                    <ul className="flex flex-col gap-2 mt-1">
                       {activityLogs.map((log) => {
                         const changesStr = formatChanges(log.changes);
                         return (
-                          <li key={log.id} className="flex flex-col gap-0.5 text-sm">
+                          <li key={log.id} className="flex flex-col gap-0.5">
                             <div className="flex items-center gap-2">
-                              <Badge variant={actionBadgeVariant(log.action)} className="capitalize text-xs">
+                              <span
+                                className={cn(
+                                  "inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium capitalize",
+                                  actionBadgeStyle[log.action] ?? "bg-muted text-muted-foreground"
+                                )}
+                              >
                                 {log.action}
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">
+                              </span>
+                              <span className="text-[10px] text-muted-foreground">
                                 {formatDistanceToNow(new Date(log.created_at), { addSuffix: true })}
                               </span>
                             </div>
                             {changesStr && (
-                              <p className="text-xs text-muted-foreground pl-1">{changesStr}</p>
+                              <p className="text-[10px] text-muted-foreground pl-0.5">{changesStr}</p>
                             )}
                           </li>
                         );
