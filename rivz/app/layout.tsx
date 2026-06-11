@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const inter = Inter({
-  variable: "--font-inter",
+const plusJakartaSans = Plus_Jakarta_Sans({
+  variable: "--font-plus-jakarta",
   subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
 });
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono",
@@ -13,8 +14,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Task Manager",
-  description: "Rival.io take-home",
+  title: "TaskFlow",
+  description: "Rival.io take-home — Task Management App",
 };
 
 export default function RootLayout({
@@ -25,7 +26,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${jetbrainsMono.variable}`}
+      className={`${plusJakartaSans.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
       <body className="min-h-screen bg-background text-foreground antialiased">

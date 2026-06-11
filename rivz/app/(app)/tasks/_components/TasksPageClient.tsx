@@ -24,7 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TaskRow } from "./TaskRow";
 import { TaskForm } from "./TaskForm";
 import { Pagination } from "./Pagination";
-import { Plus, ArrowUpDown, ClipboardList } from "lucide-react";
+import { Plus, Search, ClipboardList, ArrowUpDown } from "lucide-react";
 
 const PAGE_LIMIT = 10;
 
@@ -38,10 +38,8 @@ export function TasksPageClient() {
   const search = searchParams.get("search") ?? "";
   const sort = searchParams.get("sort") ?? "created_at";
   const order = searchParams.get("order") ?? "desc";
-
   const page = Number(searchParams.get("page") ?? "1");
 
-  // Debounced search
   const [searchInput, setSearchInput] = useState(search);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -58,10 +56,7 @@ export function TasksPageClient() {
         params.set(key, value);
       }
     });
-    // Reset to page 1 on filter change (unless explicitly setting page)
-    if (!("page" in updates)) {
-      params.set("page", "1");
-    }
+    if (!("page" in updates)) params.set("page", "1");
     router.push(`${pathname}?${params.toString()}`);
   };
 
@@ -91,22 +86,35 @@ export function TasksPageClient() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Header */}
+      {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold">Tasks</h2>
+          <h2 className="text-xl font-bold tracking-tight">My Tasks</h2>
           {!isLoading && (
-            <p className="text-sm text-muted-foreground">{total} total</p>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {total} {total === 1 ? "task" : "tasks"}
+            </p>
           )}
         </div>
-        <Button onClick={() => setNewTaskOpen(true)}>
-          <Plus data-icon="inline-start" />
+        <Button onClick={() => setNewTaskOpen(true)} size="sm">
+          <Plus className="w-4 h-4" />
           New Task
         </Button>
       </div>
 
       {/* Filter bar */}
       <div className="flex flex-wrap gap-2 items-center">
+        {/* Search */}
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Search tasks..."
+            value={searchInput}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            className="pl-8 w-52"
+          />
+        </div>
+
         {/* Status filter */}
         <Select
           value={status || "all"}
@@ -127,14 +135,6 @@ export function TasksPageClient() {
           </SelectContent>
         </Select>
 
-        {/* Search */}
-        <Input
-          placeholder="Search tasks..."
-          value={searchInput}
-          onChange={(e) => handleSearchChange(e.target.value)}
-          className="w-52"
-        />
-
         {/* Sort */}
         <Select
           value={sort}
@@ -154,32 +154,34 @@ export function TasksPageClient() {
 
         {/* Order toggle */}
         <Button variant="outline" size="sm" onClick={handleToggleOrder}>
-          <ArrowUpDown data-icon="inline-start" />
+          <ArrowUpDown className="w-3.5 h-3.5" />
           {order === "asc" ? "Ascending" : "Descending"}
         </Button>
       </div>
 
-      {/* Table (desktop) + Cards (mobile) */}
+      {/* Content */}
       {isLoading ? (
         <div className="flex flex-col gap-2">
           {Array.from({ length: 5 }).map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
+            <Skeleton key={i} className="h-14 w-full rounded-lg" />
           ))}
         </div>
       ) : tasks.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
-          <ClipboardList className="size-12 text-muted-foreground" />
+        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+          <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-muted">
+            <ClipboardList className="w-7 h-7 text-muted-foreground" />
+          </div>
           <div>
-            <p className="font-medium">No tasks found</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="font-semibold">No tasks found</p>
+            <p className="text-sm text-muted-foreground mt-1">
               {search || status
                 ? "Try adjusting your filters"
                 : "Create your first task to get started"}
             </p>
           </div>
           {!search && !status && (
-            <Button onClick={() => setNewTaskOpen(true)}>
-              <Plus data-icon="inline-start" />
+            <Button onClick={() => setNewTaskOpen(true)} size="sm">
+              <Plus className="w-4 h-4" />
               Create your first task
             </Button>
           )}
@@ -187,16 +189,16 @@ export function TasksPageClient() {
       ) : (
         <>
           {/* Desktop table */}
-          <div className="hidden md:block rounded-lg border border-border overflow-hidden">
+          <div className="hidden md:block rounded-xl border border-border overflow-hidden bg-card shadow-sm">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8"></TableHead>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="w-8" />
                   <TableHead>Title</TableHead>
                   <TableHead className="w-28">Status</TableHead>
                   <TableHead className="w-24">Priority</TableHead>
                   <TableHead className="w-36">Due Date</TableHead>
-                  <TableHead className="w-28 text-right">Actions</TableHead>
+                  <TableHead className="w-28" />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -208,7 +210,7 @@ export function TasksPageClient() {
           </div>
 
           {/* Mobile cards */}
-          <div className="md:hidden flex flex-col gap-3">
+          <div className="md:hidden flex flex-col gap-2">
             {tasks.map((task) => (
               <TaskRow key={task.id} task={task} />
             ))}
@@ -221,7 +223,6 @@ export function TasksPageClient() {
         <Pagination page={page} total={total} limit={PAGE_LIMIT} />
       )}
 
-      {/* New task form */}
       <TaskForm open={newTaskOpen} onOpenChange={setNewTaskOpen} />
     </div>
   );

@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 import { type Task, useUpdateTask, useDeleteTask } from "@/lib/tasks-hooks";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TableRow, TableCell } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
@@ -9,22 +8,45 @@ import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { TaskForm } from "./TaskForm";
 
-const priorityConfig = {
-  low: { label: "Low", className: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },
-  medium: { label: "Medium", className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" },
-  high: { label: "High", className: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" },
+const statusConfig = {
+  todo: {
+    label: "Todo",
+    className:
+      "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+  },
+  in_progress: {
+    label: "In Progress",
+    className:
+      "bg-blue-50 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  },
+  done: {
+    label: "Done",
+    className:
+      "bg-green-50 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+  },
 };
 
-const statusConfig = {
-  todo: { label: "Todo" },
-  in_progress: { label: "In Progress" },
-  done: { label: "Done" },
+const priorityConfig = {
+  low: {
+    label: "Low",
+    dot: "bg-green-500",
+    text: "text-green-700 dark:text-green-400",
+  },
+  medium: {
+    label: "Medium",
+    dot: "bg-amber-500",
+    text: "text-amber-700 dark:text-amber-400",
+  },
+  high: {
+    label: "High",
+    dot: "bg-red-500",
+    text: "text-red-600 dark:text-red-400",
+  },
 };
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return null;
-  const date = new Date(dateStr);
-  return date.toLocaleDateString("en-US", {
+  return new Date(dateStr).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -36,9 +58,7 @@ function isOverdue(dateStr: string | null) {
   return new Date(dateStr) < new Date();
 }
 
-type TaskRowProps = {
-  task: Task;
-};
+type TaskRowProps = { task: Task };
 
 export function TaskRow({ task }: TaskRowProps) {
   const [editOpen, setEditOpen] = useState(false);
@@ -65,58 +85,88 @@ export function TaskRow({ task }: TaskRowProps) {
     }
   };
 
-  const priority = priorityConfig[task.priority];
   const status = statusConfig[task.status];
+  const priority = priorityConfig[task.priority];
   const overdue = isOverdue(task.due_date);
+  const isDone = task.status === "done";
 
   return (
     <>
       {/* Desktop row */}
-      <TableRow className="hidden md:table-row">
+      <TableRow className="hidden md:table-row group">
         <TableCell className="w-8">
           <input
             type="checkbox"
-            checked={task.status === "done"}
+            checked={isDone}
             onChange={handleToggleDone}
-            className="size-4 rounded border-border accent-primary cursor-pointer"
-            aria-label={`Mark "${task.title}" as ${task.status === "done" ? "not done" : "done"}`}
+            className="size-4 rounded border-input accent-primary cursor-pointer"
+            aria-label={`Mark "${task.title}" as ${isDone ? "not done" : "done"}`}
           />
         </TableCell>
+
         <TableCell>
-          <span className={cn("font-medium", task.status === "done" && "line-through text-muted-foreground")}>
+          <span
+            className={cn(
+              "font-medium text-sm",
+              isDone && "line-through text-muted-foreground"
+            )}
+          >
             {task.title}
           </span>
           {task.description && (
-            <p className="text-xs text-muted-foreground truncate max-w-xs">{task.description}</p>
+            <p className="text-xs text-muted-foreground truncate max-w-xs mt-0.5">
+              {task.description}
+            </p>
           )}
         </TableCell>
-        <TableCell>
-          <Badge variant="outline">{status.label}</Badge>
+
+        <TableCell className="w-28">
+          <span
+            className={cn(
+              "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
+              status.className
+            )}
+          >
+            {status.label}
+          </span>
         </TableCell>
-        <TableCell>
-          <Badge className={priority.className} variant="outline">
+
+        <TableCell className="w-24">
+          <span className={cn("inline-flex items-center gap-1.5 text-xs font-medium", priority.text)}>
+            <span className={cn("size-1.5 rounded-full flex-shrink-0", priority.dot)} />
             {priority.label}
-          </Badge>
+          </span>
         </TableCell>
-        <TableCell>
+
+        <TableCell className="w-36">
           {task.due_date ? (
-            <span className={cn("text-sm", overdue && task.status !== "done" && "text-destructive font-medium")}>
+            <span
+              className={cn(
+                "text-xs",
+                overdue && !isDone
+                  ? "text-destructive font-medium"
+                  : "text-muted-foreground"
+              )}
+            >
               {formatDate(task.due_date)}
-              {overdue && task.status !== "done" && " (overdue)"}
+              {overdue && !isDone && (
+                <span className="ml-1 text-destructive/70">· overdue</span>
+              )}
             </span>
           ) : (
-            <span className="text-muted-foreground text-sm">—</span>
+            <span className="text-muted-foreground text-xs">—</span>
           )}
         </TableCell>
-        <TableCell className="text-right">
-          <div className="flex items-center justify-end gap-1">
+
+        <TableCell className="w-28 text-right">
+          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <Button
               variant="ghost"
               size="icon-sm"
               onClick={() => setEditOpen(true)}
               aria-label="Edit task"
             >
-              <Pencil />
+              <Pencil className="w-3.5 h-3.5" />
             </Button>
             {confirmDelete ? (
               <div className="flex items-center gap-1">
@@ -126,7 +176,7 @@ export function TaskRow({ task }: TaskRowProps) {
                   onClick={handleDelete}
                   disabled={deleteTask.isPending}
                 >
-                  Confirm
+                  Delete
                 </Button>
                 <Button
                   variant="ghost"
@@ -143,7 +193,7 @@ export function TaskRow({ task }: TaskRowProps) {
                 onClick={() => setConfirmDelete(true)}
                 aria-label="Delete task"
               >
-                <Trash2 className="text-destructive" />
+                <Trash2 className="w-3.5 h-3.5 text-destructive" />
               </Button>
             )}
           </div>
@@ -151,21 +201,28 @@ export function TaskRow({ task }: TaskRowProps) {
       </TableRow>
 
       {/* Mobile card */}
-      <div className="md:hidden border border-border rounded-lg p-4 flex flex-col gap-3">
+      <div className="md:hidden bg-card border border-border rounded-xl p-4 flex flex-col gap-3 shadow-sm">
         <div className="flex items-start gap-3">
           <input
             type="checkbox"
-            checked={task.status === "done"}
+            checked={isDone}
             onChange={handleToggleDone}
-            className="mt-0.5 size-4 rounded border-border accent-primary cursor-pointer"
-            aria-label={`Mark "${task.title}" as ${task.status === "done" ? "not done" : "done"}`}
+            className="mt-0.5 size-4 rounded border-input accent-primary cursor-pointer flex-shrink-0"
+            aria-label={`Mark "${task.title}" as ${isDone ? "not done" : "done"}`}
           />
           <div className="flex-1 min-w-0">
-            <p className={cn("font-medium text-sm", task.status === "done" && "line-through text-muted-foreground")}>
+            <p
+              className={cn(
+                "font-medium text-sm",
+                isDone && "line-through text-muted-foreground"
+              )}
+            >
               {task.title}
             </p>
             {task.description && (
-              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{task.description}</p>
+              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                {task.description}
+              </p>
             )}
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -175,7 +232,7 @@ export function TaskRow({ task }: TaskRowProps) {
               onClick={() => setEditOpen(true)}
               aria-label="Edit task"
             >
-              <Pencil />
+              <Pencil className="w-3.5 h-3.5" />
             </Button>
             <Button
               variant="ghost"
@@ -183,24 +240,40 @@ export function TaskRow({ task }: TaskRowProps) {
               onClick={() => setConfirmDelete(true)}
               aria-label="Delete task"
             >
-              <Trash2 className="text-destructive" />
+              <Trash2 className="w-3.5 h-3.5 text-destructive" />
             </Button>
           </div>
         </div>
+
         <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant="outline">{status.label}</Badge>
-          <Badge className={priority.className} variant="outline">
+          <span
+            className={cn(
+              "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium",
+              status.className
+            )}
+          >
+            {status.label}
+          </span>
+          <span className={cn("inline-flex items-center gap-1.5 text-xs font-medium", priority.text)}>
+            <span className={cn("size-1.5 rounded-full flex-shrink-0", priority.dot)} />
             {priority.label}
-          </Badge>
+          </span>
           {task.due_date && (
-            <span className={cn("text-xs", overdue && task.status !== "done" && "text-destructive font-medium")}>
+            <span
+              className={cn(
+                "text-xs",
+                overdue && !isDone ? "text-destructive font-medium" : "text-muted-foreground"
+              )}
+            >
               Due {formatDate(task.due_date)}
-              {overdue && task.status !== "done" && " (overdue)"}
+              {overdue && !isDone && " · overdue"}
             </span>
           )}
         </div>
+
         {confirmDelete && (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 pt-1 border-t border-border">
+            <p className="text-xs text-muted-foreground flex-1">Delete this task?</p>
             <Button
               variant="destructive"
               size="sm"

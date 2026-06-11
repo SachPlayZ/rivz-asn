@@ -24,18 +24,20 @@ export function Pagination({ page, total, limit }: PaginationProps) {
   };
 
   return (
-    <div className="flex items-center justify-between pt-4">
+    <div className="flex items-center justify-between pt-2 border-t border-border">
       <p className="text-sm text-muted-foreground">
-        Page {page} of {totalPages} ({total} tasks)
+        Page <span className="font-medium text-foreground">{page}</span> of{" "}
+        <span className="font-medium text-foreground">{totalPages}</span>
+        <span className="text-muted-foreground"> &middot; {total} tasks</span>
       </p>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <Button
           variant="outline"
           size="sm"
           onClick={() => navigate(page - 1)}
           disabled={page <= 1}
         >
-          <ChevronLeft data-icon="inline-start" />
+          <ChevronLeft className="w-3.5 h-3.5" />
           Prev
         </Button>
         <Button
@@ -45,7 +47,7 @@ export function Pagination({ page, total, limit }: PaginationProps) {
           disabled={page >= totalPages}
         >
           Next
-          <ChevronRight data-icon="inline-end" />
+          <ChevronRight className="w-3.5 h-3.5" />
         </Button>
       </div>
     </div>

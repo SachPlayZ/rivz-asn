@@ -92,12 +92,16 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Task" : "New Task"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
+
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 mt-1">
+          {/* Title */}
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="title">Title *</Label>
+            <Label htmlFor="title">
+              Title <span className="text-destructive">*</span>
+            </Label>
             <Input
               id="title"
-              placeholder="Task title"
+              placeholder="What needs to be done?"
               aria-invalid={!!errors.title}
               {...register("title")}
             />
@@ -106,17 +110,19 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
             )}
           </div>
 
+          {/* Description */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
-              placeholder="Optional description"
+              placeholder="Add more details (optional)"
               rows={3}
               {...register("description")}
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* Status + Priority */}
+          <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="status">Status</Label>
               <Select
@@ -160,6 +166,7 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
             </div>
           </div>
 
+          {/* Due Date */}
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="due_date">Due Date</Label>
             <Input
@@ -169,15 +176,18 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
             />
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="mt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleOpenChange(false)}
+            >
+              Cancel
+            </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting
-                ? isEdit
-                  ? "Saving..."
-                  : "Creating..."
-                : isEdit
-                ? "Save Changes"
-                : "Create Task"}
+                ? isEdit ? "Saving..." : "Creating..."
+                : isEdit ? "Save Changes" : "Create Task"}
             </Button>
           </DialogFooter>
         </form>
