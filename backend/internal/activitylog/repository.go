@@ -12,6 +12,7 @@ import (
 type Repository interface {
 	Insert(ctx context.Context, taskID, userID, action string, changes json.RawMessage) error
 	ListByTask(ctx context.Context, taskID string) ([]*ActivityLog, error)
+	ListByUser(ctx context.Context, userID string) ([]*ActivityLogWithTask, error)
 }
 
 type pgRepository struct {
@@ -64,6 +65,42 @@ func (r *pgRepository) ListByTask(ctx context.Context, taskID string) ([]*Activi
 
 	if logs == nil {
 		logs = []*ActivityLog{}
+	}
+	return logs, nil
+}
+
+// ListByUser returns the most recent activity logs for all tasks belonging to a user,
+// joined with the task title (falls back to "[deleted]" if the task was removed).
+func (r *pgRepository) ListByUser(ctx context.Context, userID string) ([]*ActivityLogWithTask, error) {
+	const q = `
+		SELECT al.id, al.task_id, al.user_id, al.action, al.changes, al.created_at,
+		       COALESCE(t.title, '[deleted]') AS task_title
+		FROM activity_logs al
+		LEFT JOIN tasks t ON t.id = al.task_id
+		WHERE al.user_id = $1
+		ORDER BY al.created_at DESC
+		LIMIT 500`
+
+	rows, err := r.pool.Query(ctx, q, userID)
+	if err != nil {
+		return nil, fmt.Errorf("activitylog: list by user: %w", err)
+	}
+	defer rows.Close()
+
+	var logs []*ActivityLogWithTask
+	for rows.Next() {
+		l := &ActivityLogWithTask{}
+		if err := rows.Scan(&l.ID, &l.TaskID, &l.UserID, &l.Action, &l.Changes, &l.CreatedAt, &l.TaskTitle); err != nil {
+			return nil, fmt.Errorf("activitylog: scan: %w", err)
+		}
+		logs = append(logs, l)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("activitylog: rows: %w", err)
+	}
+
+	if logs == nil {
+		logs = []*ActivityLogWithTask{}
 	}
 	return logs, nil
 }

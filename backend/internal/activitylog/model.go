@@ -15,3 +15,9 @@ type ActivityLog struct {
 	Changes   json.RawMessage `json:"changes"`
 	CreatedAt time.Time       `json:"created_at"`
 }
+
+// ActivityLogWithTask embeds ActivityLog with the task title for display in global feeds.
+type ActivityLogWithTask struct {
+	ActivityLog
+	TaskTitle string `json:"task_title"`
+}

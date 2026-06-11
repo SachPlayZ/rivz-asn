@@ -98,8 +98,12 @@ function AllTasksTab() {
           { label: "Done", value: doneTasks, icon: CheckCircle2, color: "text-emerald-500" },
           { label: "In progress", value: inProgressTasks, icon: Clock, color: "text-blue-500" },
           { label: "High priority", value: highPriorityTasks, icon: Circle, color: "text-rose-500" },
-        ].map((s) => (
-          <div key={s.label} className="rounded-xl border border-border bg-card px-4 py-3 flex items-center gap-3">
+        ].map((s, i) => (
+          <div
+            key={s.label}
+            className="rounded-xl border border-border bg-card px-4 py-3 flex items-center gap-3 animate-in fade-in-0 slide-in-from-bottom-3 duration-400"
+            style={{ animationDelay: `${i * 60}ms` }}
+          >
             <s.icon className={cn("size-4 shrink-0", s.color)} />
             <div>
               <p className="text-[11px] text-muted-foreground leading-tight">{s.label}</p>
@@ -110,7 +114,7 @@ function AllTasksTab() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2 items-center">
+      <div className="flex flex-wrap gap-2 items-center animate-in fade-in-0 slide-in-from-bottom-2 duration-400 stagger-2">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
           <Input
@@ -151,7 +155,7 @@ function AllTasksTab() {
           <p className="text-sm text-muted-foreground">No tasks match your filters</p>
         </div>
       ) : (
-        <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
+        <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm animate-in fade-in-0 slide-in-from-bottom-2 duration-400 stagger-3">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
@@ -163,8 +167,12 @@ function AllTasksTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {tasks.map((task) => (
-                <TableRow key={task.id} className="group">
+              {tasks.map((task, i) => (
+                <TableRow
+                  key={task.id}
+                  className="group animate-in fade-in-0 duration-300"
+                  style={{ animationDelay: `${i * 25}ms` }}
+                >
                   <TableCell>
                     <span className={cn("font-medium text-sm", task.status === "done" && "line-through text-muted-foreground")}>
                       {task.title}
@@ -208,8 +216,12 @@ function UsersTab() {
           { label: "Total users", value: list.length, icon: Users, color: "text-foreground" },
           { label: "Admins", value: admins, icon: ShieldCheck, color: "text-primary" },
           { label: "Total tasks", value: totalTasks, icon: ClipboardList, color: "text-blue-500" },
-        ].map((s) => (
-          <div key={s.label} className="rounded-xl border border-border bg-card px-4 py-3 flex items-center gap-3">
+        ].map((s, i) => (
+          <div
+            key={s.label}
+            className="rounded-xl border border-border bg-card px-4 py-3 flex items-center gap-3 animate-in fade-in-0 slide-in-from-bottom-3 duration-400"
+            style={{ animationDelay: `${i * 60}ms` }}
+          >
             <s.icon className={cn("size-4 shrink-0", s.color)} />
             <div>
               <p className="text-[11px] text-muted-foreground leading-tight">{s.label}</p>
@@ -231,7 +243,7 @@ function UsersTab() {
           <p className="text-sm text-muted-foreground">No users found</p>
         </div>
       ) : (
-        <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm">
+        <div className="rounded-xl border border-border overflow-hidden bg-card shadow-sm animate-in fade-in-0 slide-in-from-bottom-2 duration-400 stagger-3">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
@@ -242,8 +254,12 @@ function UsersTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {list.map((u) => (
-                <TableRow key={u.id}>
+              {list.map((u, i) => (
+                <TableRow
+                  key={u.id}
+                  className="animate-in fade-in-0 duration-300"
+                  style={{ animationDelay: `${i * 30}ms` }}
+                >
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <div className="flex size-7 items-center justify-center rounded-full bg-secondary text-secondary-foreground text-xs font-semibold shrink-0 select-none">
@@ -291,7 +307,7 @@ function UsersTab() {
 export default function AdminPage() {
   return (
     <div className="flex flex-col gap-6">
-      <div>
+      <div className="animate-in fade-in-0 slide-in-from-bottom-3 duration-400 stagger-1">
         <h2 className="text-xl font-bold tracking-tight">Admin Dashboard</h2>
         <p className="text-sm text-muted-foreground mt-0.5">Overview of all users and tasks</p>
       </div>

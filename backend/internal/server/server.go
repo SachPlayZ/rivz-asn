@@ -59,6 +59,8 @@ func New(
 	r.Group(func(r chi.Router) {
 		r.Use(auth.Authenticate(cfg.JWTSecret))
 
+		r.Get("/activity", tasksHandler.GetUserActivity)
+
 		r.Post("/tasks", tasksHandler.Create)
 		r.Get("/tasks", tasksHandler.List)
 		r.Get("/tasks/{id}", tasksHandler.Get)

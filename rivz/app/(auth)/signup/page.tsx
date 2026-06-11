@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { toast } from "sonner";
+
 export default function SignupPage() {
   const { login } = useAuth();
   const router = useRouter();
@@ -49,7 +50,8 @@ export default function SignupPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
+        {/* Heading */}
+        <div className="mb-8 text-center animate-in fade-in-0 slide-in-from-bottom-4 duration-500 stagger-1">
           <h1 className="text-2xl font-bold tracking-tight">Create an account</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Get started with TaskFlow for free
@@ -57,7 +59,7 @@ export default function SignupPage() {
         </div>
 
         {/* Card */}
-        <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+        <div className="bg-card border border-border rounded-xl p-6 shadow-sm animate-in fade-in-0 slide-in-from-bottom-4 duration-500 stagger-2">
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="email">Email</Label>
@@ -70,7 +72,9 @@ export default function SignupPage() {
                 {...register("email")}
               />
               {errors.email && (
-                <p className="text-xs text-destructive">{errors.email.message}</p>
+                <p className="text-xs text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-200">
+                  {errors.email.message}
+                </p>
               )}
             </div>
 
@@ -85,7 +89,9 @@ export default function SignupPage() {
                 {...register("password")}
               />
               {errors.password && (
-                <p className="text-xs text-destructive">{errors.password.message}</p>
+                <p className="text-xs text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-200">
+                  {errors.password.message}
+                </p>
               )}
             </div>
 
@@ -95,7 +101,8 @@ export default function SignupPage() {
           </form>
         </div>
 
-        <p className="text-sm text-center text-muted-foreground mt-4">
+        {/* Footer */}
+        <p className="text-sm text-center text-muted-foreground mt-4 animate-in fade-in-0 duration-500 stagger-3">
           Already have an account?{" "}
           <Link
             href="/login"

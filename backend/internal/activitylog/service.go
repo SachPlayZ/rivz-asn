@@ -34,3 +34,8 @@ func (s *Service) Log(ctx context.Context, taskID, userID, action string, change
 func (s *Service) ListByTask(ctx context.Context, taskID string) ([]*ActivityLog, error) {
 	return s.repo.ListByTask(ctx, taskID)
 }
+
+// ListByUser returns all recent activity logs across all tasks for a given user.
+func (s *Service) ListByUser(ctx context.Context, userID string) ([]*ActivityLogWithTask, error) {
+	return s.repo.ListByUser(ctx, userID)
+}

@@ -126,13 +126,16 @@ function ChangeList({ changes }: { changes: Record<string, unknown> | null }) {
   );
 }
 
-function ActivityEntry({ log }: { log: ActivityLogWithTask }) {
+function ActivityEntry({ log, index }: { log: ActivityLogWithTask; index: number }) {
   const [expanded, setExpanded] = useState(false);
   const hasChanges = log.changes && Object.keys(log.changes).length > 0;
   const isDeleted = log.action === "deleted";
 
   return (
-    <div className="group relative flex gap-3 rounded-xl p-3 hover:bg-muted/50 transition-colors duration-150">
+    <div
+      className="group relative flex gap-3 rounded-xl p-3 hover:bg-muted/50 transition-colors duration-150 animate-in fade-in-0 slide-in-from-right-3 duration-300"
+      style={{ animationDelay: `${Math.min(index * 35, 400)}ms` }}
+    >
       <div className="flex flex-col items-center gap-1 pt-0.5">
         <div
           className={cn(
@@ -228,7 +231,7 @@ export function ActivitySidebar({ open, onClose }: Props) {
         </div>
 
         {/* Filters */}
-        <div className="flex gap-1 overflow-x-auto px-4 py-2.5 border-b border-border scrollbar-none">
+        <div className="flex gap-1 overflow-x-auto px-4 py-2.5 border-b border-border scrollbar-none animate-in fade-in-0 slide-in-from-top-2 duration-300" style={{ animationDelay: "80ms" }}>
           {FILTERS.map((f) => (
             <button
               key={f.key}
@@ -275,8 +278,8 @@ export function ActivitySidebar({ open, onClose }: Props) {
             </div>
           ) : (
             <div className="flex flex-col">
-              {filtered.map((log) => (
-                <ActivityEntry key={log.id} log={log} />
+              {filtered.map((log, i) => (
+                <ActivityEntry key={log.id} log={log} index={i} />
               ))}
             </div>
           )}

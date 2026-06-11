@@ -61,7 +61,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8">
+      <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8 animate-in fade-in-0 slide-in-from-bottom-3 duration-400">
         {children}
       </main>
 

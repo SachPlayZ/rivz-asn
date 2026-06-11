@@ -95,7 +95,7 @@ export function TasksPageClient() {
   return (
     <div className="flex flex-col gap-6">
       {/* Page header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between animate-in fade-in-0 slide-in-from-bottom-3 duration-400 stagger-1">
         <div>
           <h2 className="text-xl font-bold tracking-tight">My Tasks</h2>
           {!isLoading && (
@@ -111,7 +111,7 @@ export function TasksPageClient() {
       </div>
 
       {/* Filter bar */}
-      <div className="flex flex-wrap gap-2 items-center">
+      <div className="flex flex-wrap gap-2 items-center animate-in fade-in-0 slide-in-from-bottom-3 duration-400 stagger-2">
         {/* Search */}
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
@@ -200,7 +200,7 @@ export function TasksPageClient() {
           )}
         </div>
       ) : (
-        <>
+        <div className="animate-in fade-in-0 slide-in-from-bottom-2 duration-500 stagger-3">
           {/* Desktop table */}
           <div className="hidden md:block rounded-xl border border-border overflow-hidden bg-card shadow-sm">
             <Table>
@@ -215,8 +215,8 @@ export function TasksPageClient() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tasks.map((task) => (
-                  <TaskRow key={task.id} task={task} />
+                {tasks.map((task, i) => (
+                  <TaskRow key={task.id} task={task} index={i} />
                 ))}
               </TableBody>
             </Table>
@@ -224,11 +224,11 @@ export function TasksPageClient() {
 
           {/* Mobile cards */}
           <div className="md:hidden flex flex-col gap-2">
-            {tasks.map((task) => (
-              <TaskRow key={task.id} task={task} />
+            {tasks.map((task, i) => (
+              <TaskRow key={task.id} task={task} index={i} />
             ))}
           </div>
-        </>
+        </div>
       )}
 
       {/* Pagination */}

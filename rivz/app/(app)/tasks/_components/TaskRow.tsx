@@ -58,9 +58,9 @@ function isOverdue(dateStr: string | null) {
   return new Date(dateStr) < new Date();
 }
 
-type TaskRowProps = { task: Task };
+type TaskRowProps = { task: Task; index?: number };
 
-export function TaskRow({ task }: TaskRowProps) {
+export function TaskRow({ task, index = 0 }: TaskRowProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const updateTask = useUpdateTask();
@@ -93,7 +93,10 @@ export function TaskRow({ task }: TaskRowProps) {
   return (
     <>
       {/* Desktop row */}
-      <TableRow className="hidden md:table-row group transition-colors">
+      <TableRow
+        className="hidden md:table-row group transition-colors animate-in fade-in-0 slide-in-from-bottom-1 duration-300"
+        style={{ animationDelay: `${index * 40}ms` }}
+      >
         <TableCell className="w-8">
           <input
             type="checkbox"
@@ -207,7 +210,10 @@ export function TaskRow({ task }: TaskRowProps) {
       </TableRow>
 
       {/* Mobile card */}
-      <div className="md:hidden bg-card border border-border rounded-xl p-4 flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow duration-200">
+      <div
+        className="md:hidden bg-card border border-border rounded-xl p-4 flex flex-col gap-3 shadow-sm hover:shadow-md transition-shadow duration-200 animate-in fade-in-0 slide-in-from-bottom-2 duration-300"
+        style={{ animationDelay: `${index * 40}ms` }}
+      >
         <div className="flex items-start gap-3">
           <input
             type="checkbox"

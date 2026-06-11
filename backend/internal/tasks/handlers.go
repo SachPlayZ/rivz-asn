@@ -198,6 +198,24 @@ func (h *Handler) GetActivity(w http.ResponseWriter, r *http.Request) {
 	httputil.JSON(w, http.StatusOK, logs)
 }
 
+// GetUserActivity handles GET /activity.
+// Returns all activity logs across all tasks owned by the authenticated user.
+func (h *Handler) GetUserActivity(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	if userID == "" {
+		httputil.Error(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	logs, err := h.activitySvc.ListByUser(r.Context(), userID)
+	if err != nil {
+		httputil.Error(w, http.StatusInternalServerError, "failed to get activity")
+		return
+	}
+
+	httputil.JSON(w, http.StatusOK, logs)
+}
+
 // validationFields converts validator.ValidationErrors into a field→tag map.
 func validationFields(errs validator.ValidationErrors) map[string]string {
 	fields := make(map[string]string, len(errs))
