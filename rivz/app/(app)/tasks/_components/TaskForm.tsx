@@ -453,9 +453,9 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
                   ) : attachments.length > 0 && (
                     <ul className="flex flex-col gap-1">
                       {attachments.map((att) => (
-                        <li key={att.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/60 transition-colors group overflow-hidden">
+                        <li key={att.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/60 transition-colors group">
                           {att.content_type.startsWith("image/") ? (
-                            <a href={att.url} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                            <a href={att.url} target="_blank" rel="noopener noreferrer">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={att.url}
@@ -466,7 +466,7 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
                           ) : (
                             <FileTypeIcon contentType={att.content_type} />
                           )}
-                          <div className="min-w-0 flex-1 overflow-hidden">
+                          <div className="overflow-hidden">
                             <a
                               href={att.url}
                               target="_blank"
