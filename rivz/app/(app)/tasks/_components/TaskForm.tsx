@@ -260,12 +260,12 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); else onOpenChange(true); }}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto p-0 gap-0">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-x-hidden overflow-y-auto p-0 gap-0">
         {isEdit && task ? (
           <div className={cn("relative overflow-hidden rounded-t-xl px-5 pt-5 pb-4", priorityBanner[task.priority].bg)}>
             <div className={cn("absolute left-0 inset-y-0 w-1 rounded-tl-xl", priorityBanner[task.priority].bar)} />
-            <div className="flex items-start justify-between gap-3 pl-2">
-              <div className="min-w-0">
+            <div className="flex items-start gap-3 pl-2 pr-8">
+              <div className="min-w-0 flex-1">
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Task</p>
                 <h2 className="text-base font-semibold leading-snug line-clamp-2">{task.title}</h2>
               </div>
@@ -453,9 +453,20 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
                   ) : attachments.length > 0 && (
                     <ul className="flex flex-col gap-1">
                       {attachments.map((att) => (
-                        <li key={att.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/60 transition-colors group">
-                          <FileTypeIcon contentType={att.content_type} />
-                          <div className="min-w-0 flex-1">
+                        <li key={att.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/60 transition-colors group overflow-hidden">
+                          {att.content_type.startsWith("image/") ? (
+                            <a href={att.url} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={att.url}
+                                alt={att.filename}
+                                className="h-9 w-9 rounded object-cover border border-border"
+                              />
+                            </a>
+                          ) : (
+                            <FileTypeIcon contentType={att.content_type} />
+                          )}
+                          <div className="min-w-0 flex-1 overflow-hidden">
                             <a
                               href={att.url}
                               target="_blank"
