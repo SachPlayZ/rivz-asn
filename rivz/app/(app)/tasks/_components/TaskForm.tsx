@@ -42,6 +42,14 @@ import {
   CheckCircle2,
   Clock,
   Circle,
+  UploadCloud,
+  File,
+  FileImage,
+  FileText,
+  FileVideo,
+  FileAudio,
+  FileCode,
+  FileArchive,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -79,6 +87,41 @@ function formatChanges(changes: Record<string, unknown> | null): string {
     .join(" · ");
 }
 
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function FileTypeIcon({ contentType }: { contentType: string }) {
+  const cls = "h-4 w-4 shrink-0 text-muted-foreground";
+  if (contentType.startsWith("image/")) return <FileImage className={cls} />;
+  if (contentType.startsWith("video/")) return <FileVideo className={cls} />;
+  if (contentType.startsWith("audio/")) return <FileAudio className={cls} />;
+  if (contentType === "application/pdf" || contentType.startsWith("text/")) return <FileText className={cls} />;
+  if (contentType.includes("zip") || contentType.includes("tar") || contentType.includes("compressed")) return <FileArchive className={cls} />;
+  if (contentType.includes("javascript") || contentType.includes("json") || contentType.includes("xml")) return <FileCode className={cls} />;
+  return <File className={cls} />;
+}
+
+const priorityBanner: Record<string, { bar: string; bg: string; badge: string; label: string }> = {
+  low:    { bar: "bg-emerald-500", bg: "bg-emerald-500/5 dark:bg-emerald-500/10", badge: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400", label: "Low" },
+  medium: { bar: "bg-amber-500",   bg: "bg-amber-500/5 dark:bg-amber-500/10",     badge: "bg-amber-500/15 text-amber-700 dark:text-amber-400",     label: "Medium" },
+  high:   { bar: "bg-rose-500",    bg: "bg-rose-500/5 dark:bg-rose-500/10",       badge: "bg-rose-500/15 text-rose-700 dark:text-rose-400",       label: "High" },
+};
+
+const statusBannerStyle: Record<string, string> = {
+  todo:        "bg-muted text-muted-foreground",
+  in_progress: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
+  done:        "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+};
+
+const statusLabel: Record<string, string> = {
+  todo: "Todo",
+  in_progress: "In Progress",
+  done: "Done",
+};
+
 const actionBadgeStyle: Record<string, string> = {
   created: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
   updated: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
@@ -95,6 +138,7 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -163,16 +207,46 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
     onOpenChange(false);
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const uploadFiles = async (files: FileList | File[]) => {
+    const arr = Array.from(files);
+    if (arr.length === 0) return;
     try {
-      await uploadAttachment.mutateAsync(file);
-      toast.success("File uploaded");
+      for (const file of arr) {
+        await uploadAttachment.mutateAsync(file);
+      }
+      toast.success(arr.length === 1 ? "File uploaded" : `${arr.length} files uploaded`);
     } catch {
       toast.error("Upload failed");
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) uploadFiles(e.target.files);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files) uploadFiles(e.dataTransfer.files);
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const files = Array.from(e.clipboardData.items)
+      .filter((item) => item.kind === "file")
+      .map((item) => item.getAsFile())
+      .filter((f): f is File => f !== null);
+    if (files.length > 0) uploadFiles(files);
   };
 
   const handleDeleteAttachment = async (attId: string) => {
@@ -186,12 +260,33 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); else onOpenChange(true); }}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit task" : "New task"}</DialogTitle>
-        </DialogHeader>
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto p-0 gap-0">
+        {isEdit && task ? (
+          <div className={cn("relative overflow-hidden rounded-t-xl px-5 pt-5 pb-4", priorityBanner[task.priority].bg)}>
+            <div className={cn("absolute left-0 inset-y-0 w-1 rounded-tl-xl", priorityBanner[task.priority].bar)} />
+            <div className="flex items-start justify-between gap-3 pl-2">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-1">Task</p>
+                <h2 className="text-base font-semibold leading-snug line-clamp-2">{task.title}</h2>
+              </div>
+              <div className="flex flex-col items-end gap-1.5 shrink-0 mt-0.5">
+                <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide", priorityBanner[task.priority].badge)}>
+                  {priorityBanner[task.priority].label}
+                </span>
+                <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide", statusBannerStyle[task.status])}>
+                  {statusIcon[task.status]}
+                  {statusLabel[task.status]}
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <DialogHeader className="px-5 pt-5 pb-0">
+            <DialogTitle>New task</DialogTitle>
+          </DialogHeader>
+        )}
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 mt-1">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 px-5 pb-5 pt-4">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="title">
               Title <span className="text-rose-500">*</span>
@@ -351,30 +446,33 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
               </button>
 
               {attachmentsOpen && (
-                <div className="px-3 pb-3 pt-1 flex flex-col gap-2 border-t border-border bg-muted/20">
+                <div className="px-3 pb-3 pt-2 flex flex-col gap-3 border-t border-border bg-muted/20">
+                  {/* File list */}
                   {attachmentsLoading ? (
                     <p className="text-xs text-muted-foreground py-1">Loading...</p>
-                  ) : attachments.length === 0 ? (
-                    <p className="text-xs text-muted-foreground py-1">No attachments yet.</p>
-                  ) : (
-                    <ul className="flex flex-col gap-1 mt-1">
+                  ) : attachments.length > 0 && (
+                    <ul className="flex flex-col gap-1">
                       {attachments.map((att) => (
-                        <li key={att.id} className="flex items-center justify-between gap-2 text-sm">
-                          <a
-                            href={att.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="truncate text-primary hover:underline text-xs"
-                          >
-                            {att.filename}
-                          </a>
+                        <li key={att.id} className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted/60 transition-colors group">
+                          <FileTypeIcon contentType={att.content_type} />
+                          <div className="min-w-0 flex-1">
+                            <a
+                              href={att.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block truncate text-xs font-medium text-foreground hover:text-primary hover:underline"
+                            >
+                              {att.filename}
+                            </a>
+                            <p className="text-[10px] text-muted-foreground">{formatBytes(att.size_bytes)}</p>
+                          </div>
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon-sm"
                             onClick={() => handleDeleteAttachment(att.id)}
                             aria-label="Delete attachment"
-                            className="shrink-0 text-muted-foreground hover:text-rose-500"
+                            className="shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-rose-500 transition-opacity"
                           >
                             <X className="h-3.5 w-3.5" />
                           </Button>
@@ -382,22 +480,44 @@ export function TaskForm({ open, onOpenChange, task }: TaskFormProps) {
                       ))}
                     </ul>
                   )}
-                  <div>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      className="hidden"
-                      onChange={handleFileChange}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={uploadAttachment.isPending}
-                    >
-                      {uploadAttachment.isPending ? "Uploading..." : "Upload file"}
-                    </Button>
+
+                  {/* Drop zone */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => fileInputRef.current?.click()}
+                    onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
+                    onDragOver={handleDragOver}
+                    onDragEnter={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onPaste={handlePaste}
+                    className={cn(
+                      "relative flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed px-4 py-5 cursor-pointer transition-all select-none",
+                      isDragging
+                        ? "border-primary bg-primary/5 scale-[1.01]"
+                        : "border-border hover:border-primary/50 hover:bg-muted/40",
+                      uploadAttachment.isPending && "pointer-events-none opacity-60"
+                    )}
+                  >
+                    <UploadCloud className={cn("h-6 w-6 transition-colors", isDragging ? "text-primary" : "text-muted-foreground")} />
+                    {uploadAttachment.isPending ? (
+                      <p className="text-xs font-medium text-muted-foreground">Uploading…</p>
+                    ) : isDragging ? (
+                      <p className="text-xs font-medium text-primary">Drop to upload</p>
+                    ) : (
+                      <>
+                        <p className="text-xs font-medium text-foreground">Drop files here or <span className="text-primary underline underline-offset-2">click to browse</span></p>
+                        <p className="text-[10px] text-muted-foreground">Max 10 MB · or paste an image with ⌘V / Ctrl+V</p>
+                      </>
+                    )}
                   </div>
                 </div>
               )}
