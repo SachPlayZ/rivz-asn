@@ -12,6 +12,13 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
+// Storage is the interface the Service uses for object storage operations.
+type Storage interface {
+	Upload(ctx context.Context, key, contentType string, body io.Reader, size int64) error
+	Delete(ctx context.Context, key string) error
+	PresignURL(ctx context.Context, key string, expiry time.Duration) (string, error)
+}
+
 // S3Client wraps the AWS S3 client with convenience methods.
 type S3Client struct {
 	client *s3.Client

@@ -14,11 +14,11 @@ const presignExpiry = time.Hour
 // Service handles business logic for task attachments.
 type Service struct {
 	repo     Repository
-	s3Client *S3Client
+	s3Client Storage
 }
 
 // NewService creates a new attachments Service.
-func NewService(repo Repository, s3Client *S3Client) *Service {
+func NewService(repo Repository, s3Client Storage) *Service {
 	return &Service{repo: repo, s3Client: s3Client}
 }
 
