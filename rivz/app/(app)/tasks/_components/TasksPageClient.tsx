@@ -1,7 +1,7 @@
 "use client";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { startOfDay, addDays, isSameDay, isBefore, isAfter, parseISO } from "date-fns";
+import { startOfDay, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameDay, isBefore, isAfter, parseISO } from "date-fns";
 import { useTasks, useBulkUpdateTasks, useBulkDeleteTasks, useUpdateTask } from "@/lib/tasks-hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,6 +72,14 @@ export function TasksPageClient() {
   );
   const handleCalendarRangeChange = useCallback((from: string, to: string) => {
     setCalendarRange(prev => prev.from === from && prev.to === to ? prev : { from, to });
+  }, []);
+
+  const [weeklyRange, setWeeklyRange] = useState<{ from: string; to: string }>(() => {
+    const now = new Date();
+    return { from: startOfWeek(now, { weekStartsOn: 1 }).toISOString(), to: endOfWeek(now, { weekStartsOn: 1 }).toISOString() };
+  });
+  const handleWeeklyRangeChange = useCallback((from: string, to: string) => {
+    setWeeklyRange(prev => prev.from === from && prev.to === to ? prev : { from, to });
   }, []);
 
   const status = searchParams.get("status") ?? "";
@@ -159,16 +167,26 @@ export function TasksPageClient() {
   const isSmartView = list !== "all";
   const isFocused = focusMode;
   const isCalendarView = displayView === "calendar" && list === "all";
-  const fetchLimit = isSmartView || isFocused ? SMART_LIMIT : isCalendarView ? 500 : PAGE_LIMIT;
+  const isKanbanView = displayView === "kanban" && list === "all";
+  const isWeeklyView = displayView === "weekly" && list === "all";
+  const isRangedView = isCalendarView || isKanbanView || isWeeklyView;
+  const fetchLimit = isSmartView || isFocused ? SMART_LIMIT : isRangedView ? 500 : PAGE_LIMIT;
+
+  const kanbanRange = useMemo(() => {
+    const now = new Date();
+    return { from: startOfMonth(now).toISOString(), to: endOfMonth(now).toISOString() };
+  }, []);
+
+  const activeRange = isCalendarView ? calendarRange : isKanbanView ? kanbanRange : isWeeklyView ? weeklyRange : null;
 
   const { data, isLoading } = useTasks({
     status: status || undefined,
     search: search || undefined,
     sort,
     order,
-    page: isSmartView || isFocused || isCalendarView ? 1 : page,
+    page: isSmartView || isFocused || isRangedView ? 1 : page,
     limit: fetchLimit,
-    ...(isCalendarView ? { due_date_from: calendarRange.from, due_date_to: calendarRange.to } : {}),
+    ...(activeRange ? { due_date_from: activeRange.from, due_date_to: activeRange.to } : {}),
   });
 
   const today = startOfDay(new Date());
@@ -503,6 +521,7 @@ export function TasksPageClient() {
             tasks={displayTasks}
             onTaskClick={(task) => router.push(`/tasks/${task.id}`)}
             onUpdateDueDate={() => {}}
+            onRangeChange={handleWeeklyRangeChange}
           />
         ) : displayView === "calendar" && list === "all" ? (
           <CalendarView
@@ -568,7 +587,7 @@ export function TasksPageClient() {
         )}
 
         {/* Pagination — only in "all" non-smart, non-calendar view */}
-        {!isLoading && !isSmartView && !isCalendarView && data && data.total > PAGE_LIMIT && (
+        {!isLoading && !isSmartView && !isRangedView && data && data.total > PAGE_LIMIT && (
           <Pagination page={page} total={data.total} limit={PAGE_LIMIT} />
         )}
 

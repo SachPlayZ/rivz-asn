@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   startOfWeek,
   endOfWeek,
@@ -25,9 +25,10 @@ type Props = {
   tasks: Task[];
   onTaskClick: (task: Task) => void;
   onUpdateDueDate: (taskId: string, dueDate: string) => void;
+  onRangeChange?: (from: string, to: string) => void;
 };
 
-export function WeeklyPlanner({ tasks, onTaskClick }: Props) {
+export function WeeklyPlanner({ tasks, onTaskClick, onRangeChange }: Props) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [undatedOpen, setUndatedOpen] = useState(false);
 
@@ -35,6 +36,12 @@ export function WeeklyPlanner({ tasks, onTaskClick }: Props) {
   const weekStart = startOfWeek(baseWeek, { weekStartsOn: 1 }); // Monday
   const weekEnd = endOfWeek(baseWeek, { weekStartsOn: 1 });
   const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
+  useEffect(() => {
+    if (!onRangeChange) return;
+    onRangeChange(weekStart.toISOString(), weekEnd.toISOString());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekOffset, onRangeChange]);
 
   const tasksForDay = (day: Date) =>
     tasks.filter((t) => t.due_date && isSameDay(parseISO(t.due_date), day));
