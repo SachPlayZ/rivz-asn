@@ -16,7 +16,8 @@ self.addEventListener("activate", (e) => {
 
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
-  if (e.request.url.includes("/api/") || e.request.url.includes(":8080")) return;
+  // Only cache same-origin requests — never intercept backend API calls.
+  if (new URL(e.request.url).origin !== self.location.origin) return;
   e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
 });
 
