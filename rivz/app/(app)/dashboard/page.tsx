@@ -105,6 +105,77 @@ function Panel({
   );
 }
 
+interface PlanItem {
+  number: number;
+  time: string;
+  task: string;
+  isBreak: boolean;
+}
+
+function parsePlan(planText: string) {
+  if (!planText) return { intro: "", items: [], conclusion: "" };
+  
+  const lines = planText.split("\n");
+  const introLines: string[] = [];
+  const items: PlanItem[] = [];
+  const conclusionLines: string[] = [];
+  let hasParsedList = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    // Check if line looks like a list item: "1. ..."
+    const listPrefixMatch = trimmed.match(/^(\d+)\.\s*(.*)$/);
+    if (listPrefixMatch) {
+      hasParsedList = true;
+      const num = parseInt(listPrefixMatch[1], 10);
+      const content = listPrefixMatch[2];
+
+      // Try to extract time range: e.g. "**09:00-10:30**" or "09:00-10:30"
+      let time = "";
+      let task = content;
+
+      // Match time range like 09:00-10:30 or 09:00 - 10:30
+      const timeRegex = /(?:\*\*)?(\d{1,2}:\d{2}\s*[-—–]\s*\d{1,2}:\d{2})(?:\*\*)?/;
+      const timeMatch = content.match(timeRegex);
+      if (timeMatch) {
+        time = timeMatch[1].trim();
+        task = content.replace(timeRegex, "").trim();
+      }
+
+      // Clean up the task description
+      task = task.replace(/^[—\-–]\s*/, "")
+                 .replace(/^:\s*/, "")
+                 .replace(/^[—\-–]\s*/, "")
+                 .replace(/\*\*/g, "")
+                 .trim();
+
+      const isBreak = task.toLowerCase().includes("break");
+      items.push({ number: num, time, task, isBreak });
+    } else {
+      if (trimmed.startsWith("###")) {
+        introLines.push(trimmed.replace(/^###\s*/, ""));
+      } else if (hasParsedList) {
+        conclusionLines.push(trimmed);
+      } else {
+        introLines.push(trimmed);
+      }
+    }
+  }
+
+  // Fallback in case formatting matches absolutely nothing
+  if (items.length === 0) {
+    return { intro: planText, items: [], conclusion: "" };
+  }
+
+  return {
+    intro: introLines.join("\n"),
+    items,
+    conclusion: conclusionLines.join("\n"),
+  };
+}
+
 function PlanMyDay() {
   const planDay = usePlanDay();
   const [open, setOpen] = useState(false);
@@ -112,6 +183,98 @@ function PlanMyDay() {
   const run = () => {
     setOpen(true);
     planDay.mutate({});
+  };
+
+  const renderContent = () => {
+    if (planDay.isPending) {
+      return (
+        <div className="space-y-2.5 py-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-9 rounded-xl bg-muted animate-pulse" />
+          ))}
+        </div>
+      );
+    }
+
+    if (planDay.isError) {
+      return (
+        <p className="text-sm text-muted-foreground py-6 text-center">
+          Couldn&apos;t generate a plan. Make sure AI is configured and you have open tasks.
+        </p>
+      );
+    }
+
+    const parsed = parsePlan(planDay.data?.plan ?? "");
+
+    if (parsed.items.length === 0) {
+      return (
+        <pre className="text-sm whitespace-pre-wrap font-sans max-h-[60vh] overflow-y-auto bg-muted/40 p-4 rounded-xl border border-border">
+          {planDay.data?.plan}
+        </pre>
+      );
+    }
+
+    return (
+      <div className="space-y-5 max-h-[65vh] overflow-y-auto pr-1">
+        {parsed.intro && (
+          <div className="rounded-xl bg-violet-500/5 border border-violet-500/10 p-3.5 text-xs text-muted-foreground leading-relaxed animate-in fade-in-0 duration-300">
+            {parsed.intro}
+          </div>
+        )}
+
+        <div className="relative pl-6 space-y-3.5 border-l border-border/75 ml-3 py-1">
+          {parsed.items.map((item, idx) => (
+            <div
+              key={idx}
+              className="relative group animate-in fade-in-0 slide-in-from-bottom-2 duration-300"
+              style={{ animationDelay: `${idx * 40}ms`, animationFillMode: "both" }}
+            >
+              {/* Timeline dot */}
+              <span className={cn(
+                "absolute -left-[30px] top-1.5 flex items-center justify-center size-3 rounded-full border bg-background transition-all duration-300",
+                item.isBreak
+                  ? "border-muted-foreground/30 bg-muted/50"
+                  : "border-primary bg-primary ring-4 ring-primary/5"
+              )} />
+
+              {/* Card item */}
+              <div className={cn(
+                "flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl border transition-all duration-200",
+                item.isBreak
+                  ? "bg-muted/15 border-border/40 hover:bg-muted/25 text-muted-foreground"
+                  : "bg-card border-border hover:border-primary/20 hover:shadow-xs text-foreground"
+              )}>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={cn(
+                    "inline-flex items-center justify-center text-[9px] font-bold shrink-0 size-4 rounded-full",
+                    item.isBreak ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary"
+                  )}>
+                    {item.number}
+                  </span>
+                  <span className={cn(
+                    "text-sm font-medium leading-none truncate",
+                    item.isBreak && "text-muted-foreground/75"
+                  )}>
+                    {item.task}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto">
+                  <Clock className="size-3 text-muted-foreground/60" />
+                  <span className="text-[11px] font-mono font-medium text-muted-foreground">{item.time}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {parsed.conclusion && (
+          <div className="text-[10px] text-muted-foreground/70 text-center px-4 leading-relaxed border-t border-border/40 pt-3.5">
+            {parsed.conclusion}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -127,21 +290,7 @@ function PlanMyDay() {
               <Sparkles className="size-4 text-violet-500" /> Your plan for today
             </DialogTitle>
           </DialogHeader>
-          {planDay.isPending ? (
-            <div className="space-y-2 py-4">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="h-6 rounded bg-muted animate-pulse" />
-              ))}
-            </div>
-          ) : planDay.isError ? (
-            <p className="text-sm text-muted-foreground py-4">
-              Couldn&apos;t generate a plan. Make sure AI is configured and you have open tasks.
-            </p>
-          ) : (
-            <pre className="text-sm whitespace-pre-wrap font-sans max-h-[60vh] overflow-y-auto">
-              {planDay.data?.plan}
-            </pre>
-          )}
+          {renderContent()}
         </DialogContent>
       </Dialog>
     </>
