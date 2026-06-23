@@ -301,7 +301,7 @@ func (r *pgRepository) GetTask(ctx context.Context, id, userID string) (*Task, e
 	err := r.pool.QueryRow(ctx, q, id, userID).Scan(
 		&t.ID, &t.UserID, &t.Title, &t.Description, &t.Status, &t.Priority,
 		&t.DueDate, &t.Recurrence, &t.RecurrenceEnd, &t.ParentTaskID, &t.AssigneeID,
-		&t.AssigneeEmail, &t.SortOrder, &t.EffortPoints, &t.ProjectID,
+		&t.AssigneeEmail, &t.ExternalEventID, &t.SortOrder, &t.EffortPoints, &t.ProjectID,
 		&t.ProjectName, &t.CreatedAt, &t.UpdatedAt,
 	)
 	if err != nil {
@@ -508,7 +508,7 @@ func (r *pgRepository) ListAllWithDueDate(ctx context.Context, userID string) ([
 			&t.AssigneeEmail, &t.ExternalEventID, &t.SortOrder, &t.EffortPoints, &t.ProjectID,
 			&t.ProjectName, &t.CreatedAt, &t.UpdatedAt,
 		); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("tasks: list-due scan: %w", err)
 		}
 		t.Tags = []Tag{}
 		tasks = append(tasks, t)

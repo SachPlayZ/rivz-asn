@@ -77,14 +77,17 @@ func toPgx5URL(u string) string {
 	return u
 }
 
-// createTestUser registers and returns the ID of a fresh user.
+// createTestUser registers a user and returns their ID.
+// Email verification is skipped in tests (no email client configured).
 func createTestUser(t *testing.T, email string) string {
 	t.Helper()
 	repo := auth.NewRepository(testPool)
-	svc := auth.NewService(repo, "test-secret")
-	result, err := svc.Signup(context.Background(), email, "password123")
+	svc := auth.NewService(repo, "test-secret", nil, "")
+	err := svc.Signup(context.Background(), email, "password123")
 	require.NoError(t, err)
-	return result.User.ID
+	user, err := repo.GetUserByEmail(context.Background(), email)
+	require.NoError(t, err)
+	return user.ID
 }
 
 func newTaskService() *tasks.Service {

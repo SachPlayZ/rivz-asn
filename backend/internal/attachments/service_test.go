@@ -127,14 +127,17 @@ func (s *stubStorage) len() int {
 	return len(s.objects)
 }
 
-// createTestUser registers a new user and returns their ID.
+// createTestUser registers a user and returns their ID.
+// Email verification is skipped in tests (no email client configured).
 func createTestUser(t *testing.T, email string) string {
 	t.Helper()
 	repo := auth.NewRepository(testPool)
-	svc := auth.NewService(repo, "test-secret")
-	result, err := svc.Signup(context.Background(), email, "password123")
+	svc := auth.NewService(repo, "test-secret", nil, "")
+	err := svc.Signup(context.Background(), email, "password123")
 	require.NoError(t, err)
-	return result.User.ID
+	user, err := repo.GetUserByEmail(context.Background(), email)
+	require.NoError(t, err)
+	return user.ID
 }
 
 // createTestTask creates a task owned by userID and returns its ID.

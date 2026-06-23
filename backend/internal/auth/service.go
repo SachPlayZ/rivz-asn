@@ -51,9 +51,10 @@ func (s *Service) Signup(ctx context.Context, email, password string) error {
 		return fmt.Errorf("auth: create verification token: %w", err)
 	}
 
-	verifyURL := s.frontendURL + "/verify-email?token=" + token
-	// Non-fatal: if email fails to send we still return success; user can resend.
-	_ = s.emailClient.SendVerification(email, verifyURL)
+	if s.emailClient != nil {
+		verifyURL := s.frontendURL + "/verify-email?token=" + token
+		_ = s.emailClient.SendVerification(email, verifyURL)
+	}
 
 	return nil
 }
@@ -128,8 +129,11 @@ func (s *Service) ResendVerification(ctx context.Context, email string) error {
 		return fmt.Errorf("auth: create token: %w", err)
 	}
 
-	verifyURL := s.frontendURL + "/verify-email?token=" + token
-	return s.emailClient.SendVerification(email, verifyURL)
+	if s.emailClient != nil {
+		verifyURL := s.frontendURL + "/verify-email?token=" + token
+		return s.emailClient.SendVerification(email, verifyURL)
+	}
+	return nil
 }
 
 // IssueTokenForOAuthUser generates a JWT for a user obtained via OAuth.

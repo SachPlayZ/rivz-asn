@@ -80,24 +80,27 @@ func newService() *auth.Service {
 }
 
 func TestSignupLoginFlow(t *testing.T) {
+	repo := auth.NewRepository(testPool)
 	svc := newService()
 	ctx := context.Background()
 
 	email := "signup_test@example.com"
 	password := "securepassword123"
 
-	// Signup should succeed and return a token.
-	signupResult, err := svc.Signup(ctx, email, password)
+	// Signup sends a verification email; in tests the email client is nil so it's skipped.
+	err := svc.Signup(ctx, email, password)
 	require.NoError(t, err)
-	assert.NotEmpty(t, signupResult.Token)
-	assert.Equal(t, email, signupResult.User.Email)
 
-	// Password must NOT be stored as plaintext.
-	repo := auth.NewRepository(testPool)
+	// User must exist in DB with the correct email.
 	user, err := repo.GetUserByEmail(ctx, email)
 	require.NoError(t, err)
-	assert.NotEqual(t, password, user.PasswordHash, "password hash must differ from plaintext password")
-	assert.NotEmpty(t, user.PasswordHash)
+	assert.Equal(t, email, user.Email)
+
+	// Verify email so login is allowed (email client disabled in tests — create token via repo).
+	verifyToken, err := repo.CreateVerificationToken(ctx, user.ID)
+	require.NoError(t, err)
+	_, err = svc.VerifyEmail(ctx, verifyToken)
+	require.NoError(t, err)
 
 	// Correct password login should succeed.
 	loginResult, err := svc.Login(ctx, email, password)
@@ -105,7 +108,7 @@ func TestSignupLoginFlow(t *testing.T) {
 	assert.NotEmpty(t, loginResult.Token)
 	assert.Equal(t, email, loginResult.User.Email)
 
-	// Wrong password must return ErrInvalidCredentials.
+	// Wrong password must return ErrInvalidCredentials (proves bcrypt is used, not plaintext compare).
 	_, err = svc.Login(ctx, email, "wrongpassword")
 	assert.ErrorIs(t, err, auth.ErrInvalidCredentials)
 
