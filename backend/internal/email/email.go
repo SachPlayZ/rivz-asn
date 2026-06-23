@@ -1,22 +1,29 @@
-// Package email sends transactional emails via the Resend API.
+// Package email sends transactional emails via SMTP.
 package email
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"net/http"
+	"net/smtp"
 )
 
-// Client sends email via Resend.
+// Client sends email via SMTP.
 type Client struct {
-	apiKey string
-	from   string
+	host string
+	port string
+	user string
+	pass string
+	from string
 }
 
-// New creates a Resend email client.
-func New(apiKey, from string) *Client {
-	return &Client{apiKey: apiKey, from: from}
+// New creates an SMTP email client.
+func New(host, port, user, pass, from string) *Client {
+	return &Client{
+		host: host,
+		port: port,
+		user: user,
+		pass: pass,
+		from: from,
+	}
 }
 
 // SendVerification sends an email verification link to the given address.
@@ -67,32 +74,12 @@ func (c *Client) SendNotification(to, title, body, url string) error {
 }
 
 func (c *Client) send(to, subject, html string) error {
-	payload := map[string]any{
-		"from":    c.from,
-		"to":      []string{to},
-		"subject": subject,
-		"html":    html,
+	var auth smtp.Auth
+	if c.user != "" {
+		auth = smtp.PlainAuth("", c.user, c.pass, c.host)
 	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("email: marshal: %w", err)
-	}
-
-	req, err := http.NewRequest(http.MethodPost, "https://api.resend.com/emails", bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("email: build request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("email: send: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("email: resend returned %d", resp.StatusCode)
-	}
-	return nil
+	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=utf-8\r\n\r\n%s",
+		c.from, to, subject, html)
+	addr := fmt.Sprintf("%s:%s", c.host, c.port)
+	return smtp.SendMail(addr, auth, c.from, []string{to}, []byte(msg))
 }

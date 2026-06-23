@@ -92,7 +92,10 @@ func run() error {
 
 	// Auth.
 	authRepo := auth.NewRepository(pool)
-	emailClient := emailpkg.New(cfg.ResendAPIKey, cfg.ResendFrom)
+	var emailClient *emailpkg.Client
+	if cfg.SMTPHost != "" {
+		emailClient = emailpkg.New(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPass, cfg.FromEmail)
+	}
 	authSvc := auth.NewService(authRepo, cfg.JWTSecret, emailClient, cfg.FrontendURL, s3Client)
 	authHandler := auth.NewHandler(authSvc)
 	oauthHandler := auth.NewOAuthHandler(
