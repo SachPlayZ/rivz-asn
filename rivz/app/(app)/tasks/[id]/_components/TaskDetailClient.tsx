@@ -1,8 +1,8 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { format, parseISO, formatDistanceToNow } from "date-fns";
-import { useTask, useUpdateTask, useDeleteTask } from "@/lib/tasks-hooks";
+import { useTask, useUpdateTask, useDeleteTask, useTasks } from "@/lib/tasks-hooks";
 import { useTaskActivity } from "@/lib/activity-hooks";
 import { useAttachments, useUploadAttachment, useDeleteAttachment } from "@/lib/attachments-hooks";
 import { useSubtasks, useCreateSubtask, useUpdateSubtask, useDeleteSubtask, useReorderSubtasks } from "@/lib/subtasks-hooks";
@@ -229,7 +229,8 @@ export function TaskDetailClient({ id }: { id: string }) {
   const [commentBody, setCommentBody] = useState("");
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentBody, setEditingCommentBody] = useState("");
-  const [depSearch, setDepSearch] = useState("");
+  const [depComboOpen, setDepComboOpen] = useState(false);
+  const [depFilter, setDepFilter] = useState("");
 
   // Sub-resource hooks (always called; enabled tracks which tabs were opened)
   const { data: subtasks = [], isLoading: subtasksLoading } = useSubtasks(id, openedTabs.has("subtasks"));
@@ -255,6 +256,17 @@ export function TaskDetailClient({ id }: { id: string }) {
   const { data: deps } = useTaskDependencies(id, openedTabs.has("dependencies"));
   const addDep = useAddDependency(id);
   const removeDep = useRemoveDependency(id);
+  const { data: depTodoData } = useTasks({ status: "todo", limit: 200 });
+  const { data: depInProgressData } = useTasks({ status: "in_progress", limit: 200 });
+  const blockableTasks = useMemo(() => {
+    const existing = new Set(deps?.blocked_by?.map((d) => d.depends_on_id) ?? []);
+    return [...(depTodoData?.data ?? []), ...(depInProgressData?.data ?? [])].filter(
+      (t) => t.id !== id && !existing.has(t.id)
+    );
+  }, [depTodoData, depInProgressData, deps, id]);
+  const filteredBlockable = depFilter
+    ? blockableTasks.filter((t) => t.title.toLowerCase().includes(depFilter.toLowerCase()))
+    : blockableTasks;
 
   const { data: activityLogs = [], isLoading: activityLoading } = useTaskActivity(id, openedTabs.has("activity"));
 
@@ -792,28 +804,42 @@ export function TaskDetailClient({ id }: { id: string }) {
                   </ul>
                 </div>
               )}
-              <div className="flex gap-2">
-                <Input
-                  value={depSearch}
-                  onChange={(e) => setDepSearch(e.target.value)}
-                  placeholder="Task ID to add as blocker…"
-                  className="h-8 text-sm"
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  className="h-8"
-                  onClick={() => {
-                    if (!depSearch.trim()) return;
-                    addDep.mutate(depSearch.trim(), {
-                      onSuccess: () => setDepSearch(""),
-                      onError: (e) => toast.error(e instanceof ApiError ? e.message : "Failed"),
-                    });
-                  }}
-                >
-                  Add
-                </Button>
-              </div>
+              <Popover open={depComboOpen} onOpenChange={setDepComboOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 text-sm w-full justify-start text-muted-foreground font-normal">
+                    <Plus className="size-3.5 mr-1.5" />
+                    Add blocker…
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72 p-2" align="start">
+                  <Input
+                    placeholder="Search tasks…"
+                    value={depFilter}
+                    onChange={(e) => setDepFilter(e.target.value)}
+                    className="h-7 text-xs mb-2"
+                  />
+                  <div className="max-h-48 overflow-y-auto flex flex-col gap-0.5">
+                    {filteredBlockable.length === 0 ? (
+                      <p className="text-xs text-muted-foreground px-2 py-1">No tasks found</p>
+                    ) : filteredBlockable.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        className="flex items-center gap-2 text-xs px-2 py-1.5 rounded hover:bg-muted text-left w-full"
+                        onClick={() => {
+                          addDep.mutate(t.id, {
+                            onSuccess: () => { setDepComboOpen(false); setDepFilter(""); },
+                            onError: (e) => toast.error(e instanceof ApiError ? e.message : "Failed"),
+                          });
+                        }}
+                      >
+                        <span className={cn("size-1.5 rounded-full flex-shrink-0", t.status === "in_progress" ? "bg-blue-500" : "bg-amber-500")} />
+                        <span className="truncate">{t.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </TabsContent>
 
             {/* Activity */}

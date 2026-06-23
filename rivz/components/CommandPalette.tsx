@@ -8,8 +8,59 @@ import { useSearch } from "@/lib/search-hooks";
 import {
   Search, Settings, ClipboardList, Inbox,
   Sun, Calendar, AlertCircle, CalendarClock, Zap,
-  FileText, MessageSquare, LayoutDashboard, Flame, Target,
+  FileText, MessageSquare, LayoutDashboard, Flame, Target, Keyboard, X,
 } from "lucide-react";
+
+const SHORTCUTS = [
+  { group: "Global", keys: ["⌘", "K"], label: "Open command palette" },
+  { group: "Global", keys: ["⌘", "B"], label: "Toggle sidebar" },
+  { group: "Global", keys: ["⌘", "/"], label: "Keyboard shortcuts" },
+  { group: "Global", keys: ["N"], label: "Quick capture" },
+  { group: "Tasks page", keys: ["/"], label: "Focus search" },
+  { group: "Tasks page", keys: ["Esc"], label: "Exit focus mode" },
+];
+
+function KeyboardShortcutsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+  const groups = [...new Set(SHORTCUTS.map((s) => s.group))];
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-20" onClick={onClose}>
+      <div
+        className="w-full max-w-sm bg-background border border-border rounded-xl shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <span className="text-sm font-semibold flex items-center gap-2">
+            <Keyboard className="size-4 text-muted-foreground" />
+            Keyboard Shortcuts
+          </span>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="p-4 flex flex-col gap-4">
+          {groups.map((group) => (
+            <div key={group}>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">{group}</p>
+              <div className="flex flex-col gap-1.5">
+                {SHORTCUTS.filter((s) => s.group === group).map((s) => (
+                  <div key={s.label} className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{s.label}</span>
+                    <span className="flex items-center gap-1">
+                      {s.keys.map((k) => (
+                        <kbd key={k} className="inline-flex items-center justify-center rounded border border-border bg-muted px-1.5 py-0.5 text-[11px] font-mono text-foreground min-w-[1.5rem]">{k}</kbd>
+                      ))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 type PaletteContextType = {
   open: boolean;
@@ -24,27 +75,40 @@ export function useCommandPalette() {
 
 export function CommandPaletteProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const { openCapture } = useQuickCapture();
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      const inInput = t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t.isContentEditable;
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         setOpen((v) => !v);
       }
+      if ((e.metaKey || e.ctrlKey) && e.key === "/") {
+        e.preventDefault();
+        setShortcutsOpen((v) => !v);
+      }
+      if (!inInput && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === "n") {
+        e.preventDefault();
+        openCapture();
+      }
     };
     window.addEventListener("keydown", down);
     return () => window.removeEventListener("keydown", down);
-  }, []);
+  }, [openCapture]);
 
   return (
     <PaletteContext.Provider value={{ open, setOpen }}>
       {children}
-      <CommandPaletteDialog open={open} setOpen={setOpen} />
+      <CommandPaletteDialog open={open} setOpen={setOpen} setShortcutsOpen={setShortcutsOpen} />
+      <KeyboardShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </PaletteContext.Provider>
   );
 }
 
-function CommandPaletteDialog({ open, setOpen }: { open: boolean; setOpen: (v: boolean) => void }) {
+function CommandPaletteDialog({ open, setOpen, setShortcutsOpen }: { open: boolean; setOpen: (v: boolean) => void; setShortcutsOpen: (v: boolean) => void }) {
   const router = useRouter();
   const { setTheme, theme } = useTheme();
   const { openCapture } = useQuickCapture();
@@ -145,6 +209,13 @@ function CommandPaletteDialog({ open, setOpen }: { open: boolean; setOpen: (v: b
                 className="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer rounded-md hover:bg-muted aria-selected:bg-muted mx-1"
               >
                 <Sun className="size-4" /> Toggle theme
+              </Command.Item>
+              <Command.Item
+                onSelect={() => { setOpen(false); setQuery(""); setShortcutsOpen(true); }}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer rounded-md hover:bg-muted aria-selected:bg-muted mx-1"
+              >
+                <Keyboard className="size-4 text-muted-foreground" /> Keyboard shortcuts
+                <span className="ml-auto text-xs text-muted-foreground">⌘/</span>
               </Command.Item>
             </Command.Group>
 

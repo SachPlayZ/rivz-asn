@@ -1,15 +1,22 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Timer, X, Check, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   useActivePomodoro,
   useStartPomodoro,
   useCompletePomodoro,
   useAbandonPomodoro,
 } from "@/lib/pomodoro-hooks";
+import { useTasks } from "@/lib/tasks-hooks";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -24,11 +31,21 @@ function formatTime(seconds: number): string {
 export function PomodoroTimer() {
   const [open, setOpen] = useState(false);
   const [duration, setDuration] = useState<25 | 50>(25);
-  const [taskName, setTaskName] = useState("");
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [breakRemaining, setBreakRemaining] = useState<number | null>(null);
 
   const { data: activeSession } = useActivePomodoro();
+  const { data: todoData } = useTasks({ status: "todo", limit: 200 });
+  const { data: inProgressData } = useTasks({ status: "in_progress", limit: 200 });
+  const availableTasks = useMemo(
+    () => [...(todoData?.data ?? []), ...(inProgressData?.data ?? [])],
+    [todoData, inProgressData]
+  );
+  const activeTaskTitle = useMemo(
+    () => activeSession?.task_id ? availableTasks.find((t) => t.id === activeSession.task_id)?.title : null,
+    [activeSession, availableTasks]
+  );
   const startPomodoro = useStartPomodoro();
   const completePomodoro = useCompletePomodoro();
   const abandonPomodoro = useAbandonPomodoro();
@@ -85,13 +102,13 @@ export function PomodoroTimer() {
 
   const handleStart = useCallback(() => {
     startPomodoro.mutate(
-      { duration_minutes: duration },
+      { duration_minutes: duration, task_id: selectedTaskId ?? undefined },
       {
         onSuccess: () => toast.success(`${duration}m pomodoro started`),
         onError: () => toast.error("Failed to start"),
       }
     );
-  }, [duration, startPomodoro]);
+  }, [duration, selectedTaskId, startPomodoro]);
 
   const handleComplete = useCallback(() => {
     if (!activeSession) return;
@@ -148,8 +165,8 @@ export function PomodoroTimer() {
           {/* Active session */}
           {!breakRemaining && activeSession && remaining !== null && (
             <div className="flex flex-col gap-3">
-              {taskName && (
-                <p className="text-xs text-muted-foreground truncate">{taskName}</p>
+              {activeTaskTitle && (
+                <p className="text-xs text-muted-foreground truncate">{activeTaskTitle}</p>
               )}
               <div className="flex items-center justify-center">
                 <span className="text-4xl font-mono font-bold tabular-nums">
@@ -196,12 +213,18 @@ export function PomodoroTimer() {
           {/* Idle state */}
           {!breakRemaining && !activeSession && (
             <div className="flex flex-col gap-3">
-              <Input
-                placeholder="Task name (optional)"
-                value={taskName}
-                onChange={(e) => setTaskName(e.target.value)}
-                className="h-7 text-xs"
-              />
+              <Select value={selectedTaskId ?? ""} onValueChange={(v) => setSelectedTaskId(v || null)}>
+                <SelectTrigger className="h-7 text-xs">
+                  <SelectValue placeholder="Link to task (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableTasks.map((t) => (
+                    <SelectItem key={t.id} value={t.id} className="text-xs">
+                      {t.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <div className="flex gap-1.5">
                 {([25, 50] as const).map((d) => (
                   <button

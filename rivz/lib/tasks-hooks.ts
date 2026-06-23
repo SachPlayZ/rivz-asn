@@ -106,7 +106,7 @@ export function useCreateTask() {
         ...newTask,
       };
       qc.setQueriesData<TasksResponse>({ queryKey: ["tasks"] }, (old) => {
-        if (!old || !Array.isArray((old as any).data)) return old;
+        if (!old || !Array.isArray(old.data)) return old;
         return {
           ...old,
           data: [optimistic, ...old.data],
@@ -132,7 +132,7 @@ export function useUpdateTask() {
       const prev = qc.getQueriesData<TasksResponse>({ queryKey: ["tasks"] });
       const prevSingle = qc.getQueryData<Task>(["tasks", updated.id]);
       qc.setQueriesData<TasksResponse>({ queryKey: ["tasks"] }, (old) => {
-        if (!old || !Array.isArray((old as any).data)) return old;
+        if (!old || !Array.isArray(old.data)) return old;
         return {
           ...old,
           data: old.data.map((t) =>
@@ -161,7 +161,7 @@ export function useDeleteTask() {
       await qc.cancelQueries({ queryKey: ["tasks"] });
       const prev = qc.getQueriesData<TasksResponse>({ queryKey: ["tasks"] });
       qc.setQueriesData<TasksResponse>({ queryKey: ["tasks"] }, (old) => {
-        if (!old || !Array.isArray((old as any).data)) return old;
+        if (!old || !Array.isArray(old.data)) return old;
         return {
           ...old,
           data: old.data.filter((t) => t.id !== id),

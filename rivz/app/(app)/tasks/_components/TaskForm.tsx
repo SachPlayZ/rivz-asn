@@ -1,11 +1,11 @@
 "use client";
-import { useRef, useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useRef, useState, useEffect, useMemo } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format, parseISO, formatDistanceToNow, addDays, addWeeks, startOfDay } from "date-fns";
 import { parseNLDate, formatNLHint } from "@/lib/nldate";
 import { taskSchema, type TaskInput } from "@/lib/schemas";
-import { useCreateTask, useUpdateTask, type Task } from "@/lib/tasks-hooks";
+import { useCreateTask, useUpdateTask, useTasks, type Task } from "@/lib/tasks-hooks";
 import { useTaskActivity } from "@/lib/activity-hooks";
 import {
   useAttachments,
@@ -219,12 +219,39 @@ export function TaskForm({ open, onOpenChange, task, defaultDate }: TaskFormProp
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
 
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    control,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<TaskInput>({
+    resolver: zodResolver(taskSchema),
+    defaultValues: {
+      title: task?.title ?? "",
+      description: task?.description ?? "",
+      status: task?.status ?? "todo",
+      priority: task?.priority ?? "medium",
+      due_date: task?.due_date ? task.due_date.slice(0, 10) : defaultDate ?? null,
+      recurrence: (task?.recurrence as TaskInput["recurrence"]) ?? null,
+      recurrence_end: task?.recurrence_end ? task.recurrence_end.slice(0, 10) : null,
+      assignee_id: task?.assignee_id ?? null,
+    },
+  });
+
+  const [statusValue, priorityValue, recurrenceValue, recurrenceEnd, assigneeId] = useWatch({
+    control,
+    name: ["status", "priority", "recurrence", "recurrence_end", "assignee_id"],
+  });
+
   const initialDate = task?.due_date ? parseISO(task.due_date) : defaultDate ? parseISO(defaultDate) : undefined;
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(initialDate);
 
   useEffect(() => {
     if (open && !task && defaultDate) {
       const d = parseISO(defaultDate);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedDate(d);
       setValue("due_date", defaultDate);
     }
@@ -242,7 +269,6 @@ export function TaskForm({ open, onOpenChange, task, defaultDate }: TaskFormProp
     { label: "Next week", date: () => addWeeks(startOfDay(new Date()), 1) },
   ] as const;
 
-  // Collapsible sections
   const [attachmentsOpen, setAttachmentsOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [subtasksOpen, setSubtasksOpen] = useState(false);
@@ -253,43 +279,14 @@ export function TaskForm({ open, onOpenChange, task, defaultDate }: TaskFormProp
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // New subtask input
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
-  // New tag inline form
   const [newTagName, setNewTagName] = useState("");
   const [newTagColor, setNewTagColor] = useState(TAG_COLORS[0]);
-  // New comment
   const [commentBody, setCommentBody] = useState("");
-  // Edit comment
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentBody, setEditingCommentBody] = useState("");
-  // Dependency search
-  const [depSearch, setDepSearch] = useState("");
-
-  const {
-    register,
-    handleSubmit,
-    setValue,
-    watch,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<TaskInput>({
-    resolver: zodResolver(taskSchema),
-    defaultValues: {
-      title: task?.title ?? "",
-      description: task?.description ?? "",
-      status: task?.status ?? "todo",
-      priority: task?.priority ?? "medium",
-      due_date: task?.due_date ? task.due_date.slice(0, 10) : defaultDate ?? null,
-      recurrence: (task?.recurrence as TaskInput["recurrence"]) ?? null,
-      recurrence_end: task?.recurrence_end ? task.recurrence_end.slice(0, 10) : null,
-      assignee_id: task?.assignee_id ?? null,
-    },
-  });
-
-  const statusValue = watch("status");
-  const priorityValue = watch("priority");
-  const recurrenceValue = watch("recurrence");
+  const [depComboOpen, setDepComboOpen] = useState(false);
+  const [depFilter, setDepFilter] = useState("");
 
   // Data fetching
   const { data: attachments = [], isLoading: attachmentsLoading } = useAttachments(task?.id ?? "", isEdit && attachmentsOpen);
@@ -312,6 +309,17 @@ export function TaskForm({ open, onOpenChange, task, defaultDate }: TaskFormProp
   const { data: deps } = useTaskDependencies(task?.id ?? "", isEdit && depsOpen);
   const addDep = useAddDependency(task?.id ?? "");
   const removeDep = useRemoveDependency(task?.id ?? "");
+  const { data: depTodoData } = useTasks({ status: "todo", limit: 200 });
+  const { data: depInProgressData } = useTasks({ status: "in_progress", limit: 200 });
+  const blockableTasks = useMemo(() => {
+    const existing = new Set(deps?.blocked_by?.map((d) => d.depends_on_id) ?? []);
+    return [...(depTodoData?.data ?? []), ...(depInProgressData?.data ?? [])].filter(
+      (t) => t.id !== task?.id && !existing.has(t.id)
+    );
+  }, [depTodoData, depInProgressData, deps, task?.id]);
+  const filteredBlockable = depFilter
+    ? blockableTasks.filter((t) => t.title.toLowerCase().includes(depFilter.toLowerCase()))
+    : blockableTasks;
   const { data: adminUsers = [] } = useAdminUsers(user?.role === "admin");
 
   const taskTags = task?.tags ?? [];
@@ -603,13 +611,13 @@ export function TaskForm({ open, onOpenChange, task, defaultDate }: TaskFormProp
                   <PopoverTrigger asChild>
                     <Button type="button" variant="outline" className="w-full justify-start text-left font-normal text-muted-foreground">
                       <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
-                      {watch("recurrence_end") ? format(parseISO(watch("recurrence_end")!), "PPP") : "Pick date"}
+                      {recurrenceEnd ? format(parseISO(recurrenceEnd), "PPP") : "Pick date"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
-                      selected={watch("recurrence_end") ? parseISO(watch("recurrence_end")!) : undefined}
+                      selected={recurrenceEnd ? parseISO(recurrenceEnd) : undefined}
                       onSelect={(d) => {
                         setValue("recurrence_end", d ? format(d, "yyyy-MM-dd") : null);
                         setRecEndCalendarOpen(false);
@@ -625,7 +633,7 @@ export function TaskForm({ open, onOpenChange, task, defaultDate }: TaskFormProp
           <div className="flex flex-col gap-1.5">
             <Label><User className="size-3 inline mr-1" />Assignee</Label>
             <Select
-              value={watch("assignee_id") ?? "none"}
+              value={assigneeId ?? "none"}
               onValueChange={(v) => setValue("assignee_id", v === "none" ? null : v)}
             >
               <SelectTrigger className="w-full">
@@ -830,28 +838,42 @@ export function TaskForm({ open, onOpenChange, task, defaultDate }: TaskFormProp
                       </ul>
                     </div>
                   )}
-                  <div className="flex gap-2">
-                    <Input
-                      value={depSearch}
-                      onChange={(e) => setDepSearch(e.target.value)}
-                      placeholder="Task ID to add as blocker..."
-                      className="h-7 text-xs"
-                    />
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="h-7"
-                      onClick={() => {
-                        if (!depSearch.trim()) return;
-                        addDep.mutate(depSearch.trim(), {
-                          onSuccess: () => setDepSearch(""),
-                          onError: (e) => toast.error(e instanceof ApiError ? e.message : "Failed"),
-                        });
-                      }}
-                    >
-                      Add
-                    </Button>
-                  </div>
+                  <Popover open={depComboOpen} onOpenChange={setDepComboOpen}>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-7 text-xs w-full justify-start text-muted-foreground font-normal">
+                        <Plus className="size-3 mr-1.5" />
+                        Add blocker…
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 p-2" align="start">
+                      <Input
+                        placeholder="Search tasks…"
+                        value={depFilter}
+                        onChange={(e) => setDepFilter(e.target.value)}
+                        className="h-7 text-xs mb-2"
+                      />
+                      <div className="max-h-48 overflow-y-auto flex flex-col gap-0.5">
+                        {filteredBlockable.length === 0 ? (
+                          <p className="text-xs text-muted-foreground px-2 py-1">No tasks found</p>
+                        ) : filteredBlockable.map((t) => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            className="flex items-center gap-2 text-xs px-2 py-1.5 rounded hover:bg-muted text-left w-full"
+                            onClick={() => {
+                              addDep.mutate(t.id, {
+                                onSuccess: () => { setDepComboOpen(false); setDepFilter(""); },
+                                onError: (e) => toast.error(e instanceof ApiError ? e.message : "Failed"),
+                              });
+                            }}
+                          >
+                            <span className={cn("size-1.5 rounded-full flex-shrink-0", t.status === "in_progress" ? "bg-blue-500" : "bg-amber-500")} />
+                            <span className="truncate">{t.title}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               )}
             </div>

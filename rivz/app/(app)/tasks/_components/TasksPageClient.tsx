@@ -244,7 +244,8 @@ export function TasksPageClient() {
 
   // Keyboard shortcuts (/ to search, Esc to exit focus)
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    const t = e.target as HTMLElement;
+    if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement || t instanceof HTMLSelectElement || t.isContentEditable) return;
     if (e.key === "/") { e.preventDefault(); searchRef.current?.focus(); }
     if (e.key === "Escape") setFocusMode(false);
   }, []);
