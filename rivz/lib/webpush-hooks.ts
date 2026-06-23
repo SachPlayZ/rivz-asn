@@ -107,6 +107,9 @@ export function useEnablePush() {
       if (!public_key) throw new Error("Web push is not configured on the server");
 
       const reg = await navigator.serviceWorker.ready;
+      // Clear any stale subscription (different VAPID key from a previous deploy/session).
+      const existing = await reg.pushManager.getSubscription();
+      if (existing) await existing.unsubscribe();
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(public_key),
