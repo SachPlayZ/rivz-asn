@@ -39,16 +39,22 @@ func (s *Service) Delete(ctx context.Context, id, userID string) error {
 // OnTaskEvent implements the tasks.AutomationEngine interface. Runs async-safe.
 // status/priority are the task's values after the change.
 func (s *Service) OnTaskEvent(ctx context.Context, userID, taskID, event, title, status, priority string) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("automations: panic in OnTaskEvent: %v", r)
+		}
+	}()
+
 	rules, err := s.repo.ListEnabled(ctx, userID)
 	if err != nil {
 		log.Printf("automations: list enabled: %v", err)
 		return
 	}
+	log.Printf("automations: event=%s status=%s rules=%d taskID=%s", event, status, len(rules), taskID)
 	for _, rule := range rules {
-		if !triggerMatches(rule.Trigger, event, status) {
-			continue
-		}
-		if !conditionsMatch(rule.Conditions, status, priority) {
+		matched := triggerMatches(rule.Trigger, event, status) && conditionsMatch(rule.Conditions, status, priority)
+		log.Printf("automations: rule=%s trigger=%+v matched=%v", rule.Name, rule.Trigger, matched)
+		if !matched {
 			continue
 		}
 		s.runActions(ctx, userID, taskID, title, rule.Actions)
@@ -113,7 +119,10 @@ func (s *Service) runActions(ctx context.Context, userID, taskID, title string, 
 					msg = "Automation triggered for: " + title
 				}
 				tid := taskID
+				log.Printf("automations: creating notification for user=%s task=%s msg=%q", userID, taskID, msg)
 				s.notif.Create(ctx, userID, "automation", &tid, msg)
+			} else {
+				log.Printf("automations: notifier is nil, skipping notify action")
 			}
 		case "webhook":
 			sendWebhook(a.Kind, a.Value, title)
