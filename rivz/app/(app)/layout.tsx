@@ -2,18 +2,16 @@
 import { useAuth } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { ThemeToggle } from "@/app/(app)/_components/ThemeToggle";
 import { ActivitySidebar } from "@/app/(app)/_components/ActivitySidebar";
-import { NotificationsBell } from "@/components/NotificationsBell";
+import { AppSidebar } from "@/app/(app)/_components/AppSidebar";
 import { CommandPaletteProvider } from "@/components/CommandPalette";
 import { QuickCaptureProvider } from "@/lib/quick-capture-context";
 import { QuickCaptureDialog } from "@/components/QuickCaptureDialog";
 import { PomodoroTimer } from "@/components/PomodoroTimer";
-import { LogOut, Activity, ShieldCheck, ClipboardList, FolderKanban, Zap, Settings, FileText, LayoutDashboard, Flame, Target } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
-import Link from "next/link";
-import Image from "next/image";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { Separator } from "@/components/ui/separator";
 import { PageTracker } from "@/components/PageTracker";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout, loading } = useAuth();
@@ -37,123 +35,36 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (!user) return null;
 
-  const initials = user.email.slice(0, 2).toUpperCase();
-
   return (
+    <TooltipProvider>
     <QuickCaptureProvider>
     <CommandPaletteProvider>
     <PageTracker userId={user?.id} />
-    <div className="min-h-screen flex flex-col">
-      <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur-md">
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <Image src="/logo.png" alt="Fayde" width={24} height={24} className="size-6 rounded-md" priority />
-            <span className="font-semibold text-sm tracking-tight">Fayde</span>
-          </Link>
+    <SidebarProvider defaultOpen={true}>
+      <AppSidebar
+        user={user}
+        onActivityOpen={() => setActivityOpen((v) => !v)}
+        onLogout={logout}
+      />
+      <SidebarInset>
+        {/* Minimal top bar */}
+        <header className="sticky top-0 z-40 flex h-12 items-center gap-2 border-b border-border bg-background/80 backdrop-blur-md px-4">
+          <SidebarTrigger className="-ml-1" />
+          <Separator orientation="vertical" className="h-4" />
+          <div className="flex-1" />
+        </header>
 
-          <div className="flex items-center gap-1.5">
-            {/* Nav links */}
-            <nav className="hidden sm:flex items-center gap-0.5 mr-2">
-              <Link
-                href="/dashboard"
-                className={buttonVariants({ variant: "ghost", size: "sm" }) + " gap-1.5 text-xs"}
-              >
-                <LayoutDashboard className="w-3.5 h-3.5" />
-                Home
-              </Link>
-              <Link
-                href="/tasks"
-                className={buttonVariants({ variant: "ghost", size: "sm" }) + " gap-1.5 text-xs"}
-              >
-                <ClipboardList className="w-3.5 h-3.5" />
-                Tasks
-              </Link>
-              <Link
-                href="/habits"
-                className={buttonVariants({ variant: "ghost", size: "sm" }) + " gap-1.5 text-xs"}
-              >
-                <Flame className="w-3.5 h-3.5" />
-                Habits
-              </Link>
-              <Link
-                href="/goals"
-                className={buttonVariants({ variant: "ghost", size: "sm" }) + " gap-1.5 text-xs"}
-              >
-                <Target className="w-3.5 h-3.5" />
-                Goals
-              </Link>
-              <Link
-                href="/projects"
-                className={buttonVariants({ variant: "ghost", size: "sm" }) + " gap-1.5 text-xs"}
-              >
-                <FolderKanban className="w-3.5 h-3.5" />
-                Projects
-              </Link>
-              <Link
-                href="/sprints"
-                className={buttonVariants({ variant: "ghost", size: "sm" }) + " gap-1.5 text-xs"}
-              >
-                <Zap className="w-3.5 h-3.5" />
-                Sprints
-              </Link>
-              <Link
-                href="/docs"
-                className={buttonVariants({ variant: "ghost", size: "sm" }) + " gap-1.5 text-xs"}
-              >
-                <FileText className="w-3.5 h-3.5" />
-                Docs
-              </Link>
-              <Link
-                href="/settings"
-                className={buttonVariants({ variant: "ghost", size: "sm" }) + " gap-1.5 text-xs"}
-              >
-                <Settings className="w-3.5 h-3.5" />
-                Settings
-              </Link>
-            </nav>
-
-            <span className="text-xs text-muted-foreground hidden sm:block mr-1">
-              {user.email}
-            </span>
-            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-secondary text-secondary-foreground text-xs font-semibold select-none">
-              {initials}
-            </div>
-            {user.role === "admin" && (
-              <Link
-                href="/admin"
-                className={buttonVariants({ variant: "ghost", size: "sm" }) + " gap-1.5 text-xs"}
-              >
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Admin
-              </Link>
-            )}
-            <NotificationsBell />
-            <ThemeToggle />
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => setActivityOpen((v) => !v)}
-              aria-label="Toggle activity log"
-              className={activityOpen ? "bg-muted" : ""}
-            >
-              <Activity className="w-4 h-4" />
-            </Button>
-            <Button variant="ghost" size="icon-sm" onClick={logout} aria-label="Sign out">
-              <LogOut className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8 animate-in fade-in-0 slide-in-from-bottom-3 duration-400">
-        {children}
-      </main>
+        <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8 animate-in fade-in-0 slide-in-from-bottom-3 duration-400">
+          {children}
+        </main>
+      </SidebarInset>
 
       <ActivitySidebar open={activityOpen} onClose={() => setActivityOpen(false)} />
       <QuickCaptureDialog />
       <PomodoroTimer />
-    </div>
+    </SidebarProvider>
     </CommandPaletteProvider>
     </QuickCaptureProvider>
+    </TooltipProvider>
   );
 }

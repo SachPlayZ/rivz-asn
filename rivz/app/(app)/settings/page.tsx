@@ -241,7 +241,11 @@ function TwoFATab() {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!setupData?.qr_url) { setQrDataUrl(null); return; }
+    if (!setupData?.qr_url) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setQrDataUrl(null);
+      return;
+    }
     import("qrcode").then((QRCode) =>
       QRCode.toDataURL(setupData.qr_url, { width: 192, margin: 2 })
         .then(setQrDataUrl)

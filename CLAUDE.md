@@ -4,7 +4,7 @@ Context map for future sessions. Read this before exploring; it captures structu
 
 ## What this is
 
-Full-stack personal task/productivity manager (Rival.io take-home, since grown into a full productivity suite). Single-user-per-account model — every domain row is scoped by `user_id`. There is **no multi-user workspace / real-time collaboration** yet (only read-only public share links). See "Feature ideas" for the planned guest-collaboration direction.
+Full-stack personal task/productivity manager a full productivity suite. Single-user-per-account model — every domain row is scoped by `user_id`. There is **no multi-user workspace / real-time collaboration** yet (only read-only public share links). See "Feature ideas" for the planned guest-collaboration direction.
 
 App is branded **"Fayde"** (the productivity suite) in all UI; repo/module name is still `rivz`/`rivz-asn` (code identifiers unchanged). Logo: `rivz/public/logo.png` (+ `icon-192/512.png` for the PWA manifest), source mark in `rivz/app/android-chrome-*.png`. When adding user-facing copy, use "Fayde".
 
