@@ -9,6 +9,7 @@ import (
 	"net/smtp"
 	"time"
 
+	"github.com/SachPlayZ/rivz-asn/backend/internal/calendarsync"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/config"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/notifications"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/reminders"
@@ -28,7 +29,7 @@ type taskItem struct {
 	Due   string
 }
 
-func Start(ctx context.Context, pool *pgxpool.Pool, notifSvc *notifications.Service, cfg *config.Config) {
+func Start(ctx context.Context, pool *pgxpool.Pool, notifSvc *notifications.Service, cfg *config.Config, calSyncSvc *calendarsync.Service) {
 	// Fast loop (every minute): fire custom reminders close to their time.
 	go func() {
 		t := time.NewTicker(1 * time.Minute)
@@ -40,6 +41,20 @@ func Start(ctx context.Context, pool *pgxpool.Pool, notifSvc *notifications.Serv
 				return
 			case now := <-t.C:
 				fireReminders(ctx, remRepo, notifSvc, now)
+			}
+		}
+	}()
+
+	// Background pull loop for Google Calendar sync (every 5 minutes)
+	go func() {
+		t := time.NewTicker(5 * time.Minute)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				pullGoogleCalendarChanges(ctx, calSyncSvc)
 			}
 		}
 	}()
@@ -189,5 +204,21 @@ func sendEmail(cfg *config.Config, to, subject, htmlBody string) {
 	addr := fmt.Sprintf("%s:%s", cfg.SMTPHost, cfg.SMTPPort)
 	if err := smtp.SendMail(addr, auth, cfg.FromEmail, []string{to}, []byte(msg)); err != nil {
 		log.Printf("scheduler: send email to %s: %v", to, err)
+	}
+}
+
+func pullGoogleCalendarChanges(ctx context.Context, calSyncSvc *calendarsync.Service) {
+	if calSyncSvc == nil {
+		return
+	}
+	conns, err := calSyncSvc.ListConnections(ctx)
+	if err != nil {
+		log.Printf("scheduler: list calendar connections: %v", err)
+		return
+	}
+	for _, c := range conns {
+		if err := calSyncSvc.PullChanges(ctx, c.UserID); err != nil {
+			log.Printf("scheduler: pull calendar changes for user %s: %v", c.UserID, err)
+		}
 	}
 }

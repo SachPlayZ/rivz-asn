@@ -46,3 +46,4 @@ yarn-error.log*
 # certs / secrets
 *.pem
 *.key
+.claude/worktrees/

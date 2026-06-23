@@ -113,6 +113,7 @@ func run() error {
 	calendarSyncRepo := calendarsync.NewRepository(pool)
 	calendarSyncSvc := calendarsync.NewService(
 		calendarSyncRepo,
+		tasksRepo,
 		cfg.GoogleClientID, cfg.GoogleClientSecret,
 		cfg.AppURL, cfg.FrontendURL, cfg.JWTSecret,
 	)
@@ -282,7 +283,7 @@ func run() error {
 	// Scheduler.
 	schedulerCtx, schedulerCancel := context.WithCancel(context.Background())
 	defer schedulerCancel()
-	go scheduler.Start(schedulerCtx, pool, notifSvc, cfg)
+	go scheduler.Start(schedulerCtx, pool, notifSvc, cfg, calendarSyncSvc)
 
 	handler := server.New(server.ServerConfig{
 		JWTSecret:  cfg.JWTSecret,

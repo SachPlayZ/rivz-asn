@@ -126,7 +126,7 @@ func (h *Handler) verifyState(state string) (string, error) {
 		return "", errors.New("invalid state format")
 	}
 	payload, sig := parts[0], parts[1]
-	if h.sign(payload) != sig {
+	if !hmac.Equal([]byte(h.sign(payload)), []byte(sig)) {
 		return "", errors.New("state signature verification failed")
 	}
 	subParts := strings.SplitN(payload, ":", 2)
