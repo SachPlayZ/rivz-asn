@@ -1,0 +1,54 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*' # Triggers the workflow when you push a tag like v0.1.0
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest' # Builds macOS DMG
+            args: '--target universal-apple-darwin'
+          - platform: 'windows-latest' # Builds Windows MSI/EXE
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 10
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+        working-directory: ./rivz
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build and Release
+        uses: tauri-apps/tauri-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEXT_PUBLIC_API_URL: https://rivz-asn.onrender.com
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: BNMHvylxqZgyn7hnBs9gpZ5dNH_WFV5t2PC_h4xRNlaeD46LiqkqETt6UHDVm0aX1sVU8IVCzSOhJpdoAGHikjQ
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Fayde v__VERSION__'
+          releaseBody: 'Fayde desktop client release'
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
+          projectPath: './rivz'
