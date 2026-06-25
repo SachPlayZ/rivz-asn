@@ -148,6 +148,11 @@ func (s *Service) HandleMessage(ctx context.Context, chatID int64, username, tex
 	}
 
 	msg := fmt.Sprintf("✅ Task created: *%s*", task.Title)
+	if task.AssigneeID != nil && *task.AssigneeID != "" && *task.AssigneeID != userID {
+		if name, err := s.repo.GetAssigneeName(ctx, *task.AssigneeID); err == nil {
+			msg = fmt.Sprintf("✅ Task created and assigned to *%s*: *%s*", name, task.Title)
+		}
+	}
 	if isAI {
 		var details []string
 		if task.Description != "" {
@@ -170,11 +175,13 @@ func (s *Service) HandleMessage(ctx context.Context, chatID int64, username, tex
 }
 
 type parsedTask struct {
-	Title        string `json:"title"`
-	Description  string `json:"description"`
-	Priority     string `json:"priority"`
-	DueDate      string `json:"due_date"`
-	EffortPoints *int   `json:"effort_points"`
+	Title                    string `json:"title"`
+	Description              string `json:"description"`
+	Priority                 string `json:"priority"`
+	DueDate                  string `json:"due_date"`
+	EffortPoints             *int   `json:"effort_points"`
+	AssigneeTelegramUsername string `json:"assignee_telegram_username"`
+	AssigneeEmail            string `json:"assignee_email"`
 }
 
 func (s *Service) parseWithAI(ctx context.Context, text string) tasks.CreateRequest {
@@ -186,13 +193,16 @@ If it contains more context, set it as description.
 If it implies a due date, output it in YYYY-MM-DD format (today is %s).
 If you can estimate the difficulty/effort (on a scale of 1 to 10), set effort_points (integer).
 If you can figure out priority, set priority ("low"|"medium"|"high").
+If the text implies the task is for or assigned to another user, try to extract their Telegram username (e.g. "@username" -> "username") into assignee_telegram_username, or their email address into assignee_email.
 Respond with ONLY valid JSON. Do not wrap the JSON in markdown code blocks:
 {
   "title": "concise title",
   "description": "contextual details or rephrased instructions",
   "priority": "low"|"medium"|"high"|null,
   "due_date": "YYYY-MM-DD"|null,
-  "effort_points": int|null
+  "effort_points": int|null,
+  "assignee_telegram_username": "username"|null,
+  "assignee_email": "email"|null
 }`, todayStr)
 
 	content, err := s.groqClient.Chat(ctx, []groq.Message{
@@ -219,11 +229,34 @@ Respond with ONLY valid JSON. Do not wrap the JSON in markdown code blocks:
 		p.Title = text
 	}
 
+	// Clean username prefix @ if present
+	p.AssigneeTelegramUsername = strings.TrimPrefix(p.AssigneeTelegramUsername, "@")
+
+	var assigneeID string
+	if p.AssigneeTelegramUsername != "" {
+		if aid, err := s.repo.UserIDByTelegramUsername(ctx, p.AssigneeTelegramUsername); err == nil {
+			assigneeID = aid
+		} else {
+			log.Printf("telegram: lookup assignee by username %q: %v", p.AssigneeTelegramUsername, err)
+		}
+	}
+	if assigneeID == "" && p.AssigneeEmail != "" {
+		if aid, err := s.repo.UserIDByEmail(ctx, p.AssigneeEmail); err == nil {
+			assigneeID = aid
+		} else {
+			log.Printf("telegram: lookup assignee by email %q: %v", p.AssigneeEmail, err)
+		}
+	}
+
 	req := tasks.CreateRequest{
 		Title:        p.Title,
 		Description:  p.Description,
 		Priority:     p.Priority,
 		EffortPoints: p.EffortPoints,
+	}
+
+	if assigneeID != "" {
+		req.AssigneeID = &assigneeID
 	}
 
 	if p.DueDate != "" {
