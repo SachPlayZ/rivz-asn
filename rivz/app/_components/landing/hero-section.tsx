@@ -2,7 +2,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { motion, useReducedMotion, useAnimate } from "motion/react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 const words = [
   { text: "Think", muted: false },
@@ -17,6 +17,37 @@ const RING_DURATION = 4.5;
 export function HeroSection() {
   const reduce = useReducedMotion();
   const [scope, animate] = useAnimate();
+
+  const [downloadLink, setDownloadLink] = useState<{
+    url: string;
+    label: string;
+    os: "mac" | "windows" | "other";
+  }>({
+    url: "https://github.com/SachPlayZ/Fayde/releases/download/v0.1.0/Fayde_0.1.0_universal.dmg",
+    label: "Download App",
+    os: "other",
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const ua = window.navigator.userAgent.toLowerCase();
+
+    const macUrl = "https://github.com/SachPlayZ/Fayde/releases/download/v0.1.0/Fayde_0.1.0_universal.dmg";
+    const winUrl = "https://github.com/SachPlayZ/Fayde/releases/download/v0.1.0/Fayde_0.1.0_x64-setup.exe";
+
+    let linkConfig: { url: string; label: string; os: "mac" | "windows" | "other" };
+
+    if (ua.includes("mac")) {
+      linkConfig = { url: macUrl, label: "Download for macOS", os: "mac" };
+    } else if (ua.includes("win")) {
+      linkConfig = { url: winUrl, label: "Download for Windows", os: "windows" };
+    } else {
+      linkConfig = { url: macUrl, label: "Download for macOS", os: "mac" };
+    }
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDownloadLink(linkConfig);
+  }, []);
 
   useEffect(() => {
     if (!scope.current) return;
@@ -114,20 +145,72 @@ export function HeroSection() {
               initial={reduce ? false : { opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.85, ease: [0.16, 1, 0.3, 1] }}
-              className="flex items-center gap-5 flex-shrink-0"
+              className="flex flex-col gap-4 flex-shrink-0"
             >
-              <Link
-                href="/signup"
-                className="bg-white text-black font-semibold px-7 py-3.5 rounded-full hover:bg-zinc-100 transition-all duration-200 active:scale-[0.97] text-sm whitespace-nowrap"
-              >
-                Start free
-              </Link>
-              <Link
-                href="/login"
-                className="text-zinc-500 hover:text-white text-sm transition-colors duration-200 whitespace-nowrap"
-              >
-                Sign in
-              </Link>
+              <div className="flex items-center gap-5">
+                <a
+                  href={downloadLink.url}
+                  className="bg-white text-black font-semibold px-7 py-3.5 rounded-full hover:bg-zinc-100 transition-all duration-200 active:scale-[0.97] text-sm whitespace-nowrap flex items-center gap-2 shadow-lg"
+                >
+                  {downloadLink.os === "mac" && (
+                    <svg className="size-4 fill-current" viewBox="0 0 170 170">
+                      <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.38.13-9.13-1.91-14.26-6.12-3.23-2.61-7.14-7.22-11.75-13.85-8.86-12.8-15.53-27.46-20.02-43.99-4.5-16.53-6.75-32.06-6.75-46.6 0-16.32 3.96-29.83 11.89-40.54 7.93-10.71 18.06-16.19 30.38-16.44 6.75-.12 13.51 1.76 20.29 5.65 6.78 3.89 11.23 5.84 13.35 5.84 2.11 0 6.64-1.95 13.56-5.84 6.93-3.89 13.43-5.71 19.51-5.46 12.12.5 21.91 4.88 29.38 13.14 7.46 8.25 11.66 18.57 12.61 30.93-12.45 5.09-21.73 12.59-27.84 22.52-6.11 9.93-9.17 21.05-9.17 33.37 0 9.8 2.37 18.42 7.12 25.86 4.75 7.44 11.08 13.14 19 17.11-2.91 8.76-6.78 17.47-11.61 26.13zM119.22 30.25c0-8.23 2.76-15.89 8.28-22.96 5.53-7.08 12.42-11.67 20.67-13.79.13 1.13.2 2.13.2 3.01 0 8.01-2.96 15.65-8.88 22.92-5.91 7.28-13.09 12-21.52 14.18-.88-2.12-1.35-5.89-1.35-11.36z" />
+                    </svg>
+                  )}
+                  {downloadLink.os === "windows" && (
+                    <svg className="size-4 fill-current" viewBox="0 0 88 88">
+                      <path d="M0 12v30.43l35.22-.09V8.57zM39.13 7.57v34.87l48.87.13V0zM0 45.43V76l35.22 3.43V45.34zM39.13 45.34v35.09l48.87 3.57V45.47z" />
+                    </svg>
+                  )}
+                  {downloadLink.label}
+                </a>
+                <Link
+                  href="/signup"
+                  className="text-zinc-400 hover:text-white text-sm transition-colors duration-200 whitespace-nowrap"
+                >
+                  Use web version
+                </Link>
+                <Link
+                  href="/login"
+                  className="text-zinc-500 hover:text-white text-sm transition-colors duration-200 whitespace-nowrap"
+                >
+                  Sign in
+                </Link>
+              </div>
+              <div className="pl-1">
+                {downloadLink.os === "mac" ? (
+                  <a
+                    href="https://github.com/SachPlayZ/Fayde/releases/download/v0.1.0/Fayde_0.1.0_x64-setup.exe"
+                    className="text-zinc-600 hover:text-zinc-400 text-xs transition-colors duration-200"
+                  >
+                    Looking for Windows? <span className="underline">Download for Windows (.exe)</span>
+                  </a>
+                ) : downloadLink.os === "windows" ? (
+                  <a
+                    href="https://github.com/SachPlayZ/Fayde/releases/download/v0.1.0/Fayde_0.1.0_universal.dmg"
+                    className="text-zinc-600 hover:text-zinc-400 text-xs transition-colors duration-200"
+                  >
+                    Looking for macOS? <span className="underline">Download for macOS (.dmg)</span>
+                  </a>
+                ) : (
+                  <div className="flex items-center gap-3 text-zinc-600 text-xs">
+                    <span>Downloads:</span>
+                    <a
+                      href="https://github.com/SachPlayZ/Fayde/releases/download/v0.1.0/Fayde_0.1.0_universal.dmg"
+                      className="text-zinc-500 hover:text-zinc-300 underline transition-colors duration-200"
+                    >
+                      macOS (.dmg)
+                    </a>
+                    <span>|</span>
+                    <a
+                      href="https://github.com/SachPlayZ/Fayde/releases/download/v0.1.0/Fayde_0.1.0_x64-setup.exe"
+                      className="text-zinc-500 hover:text-zinc-300 underline transition-colors duration-200"
+                    >
+                      Windows (.exe)
+                    </a>
+                  </div>
+                )}
+              </div>
             </motion.div>
           </div>
         </div>
