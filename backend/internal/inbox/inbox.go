@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"regexp"
 	"strings"
 
+	"github.com/SachPlayZ/rivz-asn/backend/internal/auth"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/tasks"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -36,10 +38,11 @@ type Handler struct {
 	repo     *Repository
 	tasksSvc *tasks.Service
 	apiKey   string
+	domain   string
 }
 
-func NewHandler(repo *Repository, tasksSvc *tasks.Service, apiKey string) *Handler {
-	return &Handler{repo: repo, tasksSvc: tasksSvc, apiKey: apiKey}
+func NewHandler(repo *Repository, tasksSvc *tasks.Service, apiKey, domain string) *Handler {
+	return &Handler{repo: repo, tasksSvc: tasksSvc, apiKey: apiKey, domain: domain}
 }
 
 // inboundPayload is a permissive view of Resend's inbound email event.
@@ -143,6 +146,71 @@ func (h *Handler) Webhook(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// inboxStatusResponse is the response body for GET /inbox/status.
+type inboxStatusResponse struct {
+	Email            string   `json:"email"`
+	MXConfigured     bool     `json:"mx_configured"`
+	RequiredMXRecord string   `json:"required_mx_record,omitempty"`
+	MXRecords        []string `json:"mx_records,omitempty"`
+}
+
+// Status handles GET /inbox/status — checks DNS MX records and returns the user's inbox address.
+func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromContext(r.Context())
+	var token string
+	if err := h.repo.pool.QueryRow(r.Context(),
+		`SELECT COALESCE(inbox_token, '') FROM users WHERE id = $1`, userID,
+	).Scan(&token); err != nil {
+		log.Printf("inbox: status get token: %v", err)
+	}
+
+	// Perform DNS MX lookup on the inbox domain.
+	inboxDomain := h.domain
+	mxRecords, err := net.LookupMX(inboxDomain)
+	configured := err == nil && len(mxRecords) > 0
+
+	var names []string
+	for _, mx := range mxRecords {
+		names = append(names, mx.Host)
+	}
+
+	email := ""
+	if token != "" {
+		email = "u+" + token + "@" + inboxDomain
+	}
+
+	writeJSON(w, inboxStatusResponse{
+		Email:            email,
+		MXConfigured:     configured,
+		RequiredMXRecord: "inbound.resend.com.",
+		MXRecords:        names,
+	})
+}
+
+// RegenerateToken handles POST /inbox/regenerate-token.
+func (h *Handler) RegenerateToken(w http.ResponseWriter, r *http.Request) {
+	uid := auth.UserIDFromContext(r.Context())
+	if uid == "" {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	const q = `UPDATE users SET inbox_token = encode(gen_random_bytes(6), 'hex') WHERE id = $1 RETURNING inbox_token`
+	var newToken string
+	if err := h.repo.pool.QueryRow(r.Context(), q, uid).Scan(&newToken); err != nil {
+		log.Printf("inbox: regenerate token: %v", err)
+		http.Error(w, "failed to regenerate token", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, map[string]string{"inbox_token": newToken})
+}
+
+func writeJSON(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(v)
+}
+
 // extractToken scans the `to` field (string or array) for an inbox token.
 func extractToken(raw json.RawMessage) string {
 	if len(raw) == 0 {
@@ -162,3 +230,4 @@ func extractToken(raw json.RawMessage) string {
 	}
 	return ""
 }
+

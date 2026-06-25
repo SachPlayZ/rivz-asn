@@ -33,6 +33,7 @@ import (
 	"github.com/SachPlayZ/rivz-asn/backend/internal/subtasks"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/tags"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/tasks"
+	"github.com/SachPlayZ/rivz-asn/backend/internal/telegram"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/templates"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/timetracking"
 	totppkg "github.com/SachPlayZ/rivz-asn/backend/internal/totp"
@@ -83,6 +84,7 @@ func New(
 	automationsHandler *automations.Handler,
 	inboxHandler *inbox.Handler,
 	calendarSyncHandler *calendarsync.Handler,
+	telegramHandler *telegram.Handler,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -327,6 +329,17 @@ func New(
 		r.Post("/settings/webhooks", webhooksHandler.Create)
 		r.Patch("/settings/webhooks/{id}", webhooksHandler.Update)
 		r.Delete("/settings/webhooks/{id}", webhooksHandler.Delete)
+
+		// Inbox status (Issue #4).
+		r.Get("/inbox/status", inboxHandler.Status)
+		r.Post("/inbox/regenerate-token", inboxHandler.RegenerateToken)
+
+		// Telegram integration (Issue #3).
+		if telegramHandler != nil {
+			r.Post("/telegram/link", telegramHandler.GenerateCode)
+			r.Get("/telegram/link", telegramHandler.Status)
+			r.Delete("/telegram/link", telegramHandler.Unlink)
+		}
 
 		// AI (only if groqHandler is non-nil).
 		if groqHandler != nil {

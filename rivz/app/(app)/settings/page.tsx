@@ -27,6 +27,10 @@ import {
   Trash2,
   Plus,
   AlertTriangle,
+  Send,
+  RefreshCw,
+  X,
+  CheckCircle,
 } from "lucide-react";
 import { Bell, User as UserIcon } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -45,6 +49,7 @@ import { useAPITokens, useCreateAPIToken, useDeleteAPIToken } from "@/lib/apitok
 import { useTOTPStatus, useSetupTOTP, useEnableTOTP, useDisableTOTP } from "@/lib/totp-hooks";
 import type { TOTPSetup } from "@/lib/totp-hooks";
 import { useWebhooks, useCreateWebhook, useDeleteWebhook } from "@/lib/webhooks-hooks";
+import { useTelegramLink, useLinkTelegram, useUnlinkTelegram } from "@/lib/telegram-hooks";
 
 const WEBHOOK_EVENTS = [
   "task.created",
@@ -869,7 +874,27 @@ function NotificationsTab() {
 
       {me.inbox_token && (
         <div className="rounded-xl border border-border bg-card p-5">
-          <Label className="text-sm font-medium">Email to task</Label>
+          <div className="flex items-center justify-between mb-1">
+            <Label className="text-sm font-medium">Email to task</Label>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="text-muted-foreground hover:text-foreground"
+              title="Regenerate inbox address"
+              onClick={async () => {
+                const token = localStorage.getItem("token");
+                const apiURL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+                const res = await fetch(`${apiURL}/inbox/regenerate-token`, {
+                  method: "POST",
+                  headers: token ? { Authorization: `Bearer ${token}` } : {},
+                });
+                if (res.ok) toast.success("Inbox address regenerated — reload to see the new address");
+                else toast.error("Failed to regenerate inbox address");
+              }}
+            >
+              <RefreshCw className="size-3.5" />
+            </Button>
+          </div>
           <p className="text-xs text-muted-foreground mt-0.5 mb-3">
             Send or forward an email to this address to create a task (subject → title, body → description).
           </p>
@@ -915,6 +940,125 @@ function NotificationsTab() {
           <Button onClick={saveChat} disabled={!chatDirty || updatePrefs.isPending}>
             Save
           </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Telegram Tab ─────────────────────────────────────────────────────────────
+
+function TelegramTab() {
+  const { data: linkStatus, isLoading } = useTelegramLink();
+  const linkTelegram = useLinkTelegram();
+  const unlinkTelegram = useUnlinkTelegram();
+  const [linkData, setLinkData] = useState<{ code: string; bot_url: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleGenerateCode = () => {
+    linkTelegram.mutate(undefined, {
+      onSuccess: (data) => setLinkData(data),
+      onError: () => toast.error("Failed to generate link code"),
+    });
+  };
+
+  const handleUnlink = () => {
+    unlinkTelegram.mutate(undefined, {
+      onSuccess: () => {
+        toast.success("Telegram unlinked");
+        setLinkData(null);
+      },
+      onError: () => toast.error("Failed to unlink Telegram"),
+    });
+  };
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (isLoading) {
+    return <div className="mt-4 h-32 rounded-xl border border-border bg-card animate-pulse" />;
+  }
+
+  return (
+    <div className="mt-4 flex flex-col gap-4">
+      <div className="rounded-xl border border-border bg-card p-5 flex flex-col gap-4">
+        <div className="flex items-center gap-2.5">
+          <Send className="w-5 h-5 text-primary" />
+          <h3 className="text-sm font-semibold">Telegram Bot Integration</h3>
+          {linkStatus?.linked && (
+            <Badge className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20">
+              Linked
+            </Badge>
+          )}
+        </div>
+
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Link your Telegram account to create tasks by sending messages to the Fayde bot.
+        </p>
+
+        {linkStatus?.linked ? (
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 rounded-lg">
+              <CheckCircle className="w-4 h-4 shrink-0" />
+              <span>Linked as <strong>@{linkStatus.username}</strong></span>
+            </div>
+            <Button
+              variant="destructive"
+              size="sm"
+              className="w-fit"
+              onClick={handleUnlink}
+              disabled={unlinkTelegram.isPending}
+            >
+              <X className="w-3.5 h-3.5 mr-1.5" />
+              Unlink Telegram
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {linkData ? (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/8 p-3">
+                  <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    This code expires in 10 minutes. Open the bot and send <code className="font-mono bg-amber-500/10 px-1 rounded">/start {linkData.code}</code>
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 rounded-lg border border-border bg-muted px-3 py-2 text-xs font-mono">
+                    {linkData.code}
+                  </code>
+                  <Button size="icon-sm" variant="outline" onClick={() => handleCopy(linkData.code)}>
+                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  </Button>
+                </div>
+                <Button
+                  className="w-fit"
+                  onClick={() => window.open(linkData.bot_url, "_blank")}
+                >
+                  <Send className="w-3.5 h-3.5 mr-1.5" />
+                  Open Bot in Telegram
+                </Button>
+              </div>
+            ) : (
+              <Button
+                className="w-fit"
+                onClick={handleGenerateCode}
+                disabled={linkTelegram.isPending}
+              >
+                <Send className="w-3.5 h-3.5 mr-1.5" />
+                {linkTelegram.isPending ? "Generating..." : "Link Telegram Account"}
+              </Button>
+            )}
+          </div>
+        )}
+
+        <div className="border-t border-border pt-3">
+          <p className="text-xs text-muted-foreground">
+            Once linked, send any message to the bot to instantly create a task in Fayde.
+          </p>
         </div>
       </div>
     </div>
@@ -1229,6 +1373,10 @@ export default function SettingsPage() {
             <Calendar className="size-3.5 mr-1.5" />
             Calendar
           </TabsTrigger>
+          <TabsTrigger value="telegram" className="rounded-lg text-xs">
+            <Send className="size-3.5 mr-1.5" />
+            Telegram
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile">
@@ -1254,6 +1402,9 @@ export default function SettingsPage() {
         </TabsContent>
         <TabsContent value="calendar">
           <CalendarTab />
+        </TabsContent>
+        <TabsContent value="telegram">
+          <TelegramTab />
         </TabsContent>
       </Tabs>
     </div>

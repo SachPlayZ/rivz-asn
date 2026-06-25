@@ -6,13 +6,14 @@ import (
 	"fmt"
 	"html/template"
 	"log"
-	"net/smtp"
 	"time"
 
 	"github.com/SachPlayZ/rivz-asn/backend/internal/calendarsync"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/config"
+	emailpkg "github.com/SachPlayZ/rivz-asn/backend/internal/email"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/notifications"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/reminders"
+	"github.com/SachPlayZ/rivz-asn/backend/internal/tasks"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -29,7 +30,7 @@ type taskItem struct {
 	Due   string
 }
 
-func Start(ctx context.Context, pool *pgxpool.Pool, notifSvc *notifications.Service, cfg *config.Config, calSyncSvc *calendarsync.Service) {
+func Start(ctx context.Context, pool *pgxpool.Pool, notifSvc *notifications.Service, cfg *config.Config, calSyncSvc *calendarsync.Service, tasksSvc *tasks.Service) {
 	// Fast loop (every minute): fire custom reminders close to their time.
 	go func() {
 		t := time.NewTicker(1 * time.Minute)
@@ -66,7 +67,7 @@ func Start(ctx context.Context, pool *pgxpool.Pool, notifSvc *notifications.Serv
 		case <-ctx.Done():
 			return
 		case t := <-ticker.C:
-			runTick(ctx, pool, notifSvc, cfg, t)
+			runTick(ctx, pool, notifSvc, cfg, t, tasksSvc)
 		}
 	}
 }
@@ -91,12 +92,16 @@ func fireReminders(ctx context.Context, repo *reminders.Repository, notifSvc *no
 	}
 }
 
-func runTick(ctx context.Context, pool *pgxpool.Pool, notifSvc *notifications.Service, cfg *config.Config, now time.Time) {
+func runTick(ctx context.Context, pool *pgxpool.Pool, notifSvc *notifications.Service, cfg *config.Config, now time.Time, tasksSvc *tasks.Service) {
 	// Due reminders
 	sendDueReminders(ctx, pool, notifSvc, now)
 	// Daily digest at 8am UTC
 	if now.UTC().Hour() == 8 {
 		sendDailyDigests(ctx, pool, cfg, now)
+	}
+	// Catchup: spawn next instances for done recurring tasks that missed their spawn.
+	if tasksSvc != nil {
+		genereateMissedRecurrences(ctx, tasksSvc)
 	}
 }
 
@@ -198,12 +203,20 @@ func buildDigest(ctx context.Context, pool *pgxpool.Pool, userID string, now tim
 }
 
 func sendEmail(cfg *config.Config, to, subject, htmlBody string) {
-	auth := smtp.PlainAuth("", cfg.SMTPUser, cfg.SMTPPass, cfg.SMTPHost)
-	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nContent-Type: text/html; charset=utf-8\r\n\r\n%s",
-		cfg.FromEmail, to, subject, htmlBody)
-	addr := fmt.Sprintf("%s:%s", cfg.SMTPHost, cfg.SMTPPort)
-	if err := smtp.SendMail(addr, auth, cfg.FromEmail, []string{to}, []byte(msg)); err != nil {
+	if cfg.SMTPHost == "" {
+		return
+	}
+	cl := emailpkg.New(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPass, cfg.FromEmail)
+	if err := cl.SendNotification(to, subject, htmlBody, ""); err != nil {
 		log.Printf("scheduler: send email to %s: %v", to, err)
+	}
+}
+
+// genereateMissedRecurrences spawns new task instances for completed recurring
+// tasks that have no child task yet (e.g. server was down at completion time).
+func genereateMissedRecurrences(ctx context.Context, tasksSvc *tasks.Service) {
+	if err := tasksSvc.SpawnMissedRecurrences(ctx); err != nil {
+		log.Printf("scheduler: spawn missed recurrences: %v", err)
 	}
 }
 

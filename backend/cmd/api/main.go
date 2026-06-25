@@ -44,6 +44,7 @@ import (
 	"github.com/SachPlayZ/rivz-asn/backend/internal/subtasks"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/tags"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/tasks"
+	"github.com/SachPlayZ/rivz-asn/backend/internal/telegram"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/templates"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/timetracking"
 	totppkg "github.com/SachPlayZ/rivz-asn/backend/internal/totp"
@@ -95,6 +96,11 @@ func run() error {
 	var emailClient *emailpkg.Client
 	if cfg.SMTPHost != "" {
 		emailClient = emailpkg.New(cfg.SMTPHost, cfg.SMTPPort, cfg.SMTPUser, cfg.SMTPPass, cfg.FromEmail)
+		if err := emailClient.Ping(); err != nil {
+			log.Printf("WARNING: SMTP health check failed — email delivery may not work: %v", err)
+		} else {
+			log.Println("SMTP: connection OK")
+		}
 	}
 	authSvc := auth.NewService(authRepo, cfg.JWTSecret, emailClient, cfg.FrontendURL, s3Client)
 	authHandler := auth.NewHandler(authSvc)
@@ -229,11 +235,12 @@ func run() error {
 	// Pomodoro.
 	pomodoroRepo := pomodoro.NewRepository(pool)
 	pomodoroSvc := pomodoro.NewService(pomodoroRepo)
+	pomodoroSvc.SetTimeTracker(timeSvc)
 	pomodoroHandler := pomodoro.NewHandler(pomodoroSvc)
 
 	// Email-to-task inbound.
 	inboxRepo := inbox.NewRepository(pool)
-	inboxHandler := inbox.NewHandler(inboxRepo, tasksSvc, cfg.ResendAPIKey)
+	inboxHandler := inbox.NewHandler(inboxRepo, tasksSvc, cfg.ResendAPIKey, cfg.InboxDomain)
 
 	// Automations engine.
 	automationsRepo := automations.NewRepository(pool)
@@ -288,7 +295,17 @@ func run() error {
 	// Scheduler.
 	schedulerCtx, schedulerCancel := context.WithCancel(context.Background())
 	defer schedulerCancel()
-	go scheduler.Start(schedulerCtx, pool, notifSvc, cfg, calendarSyncSvc)
+	go scheduler.Start(schedulerCtx, pool, notifSvc, cfg, calendarSyncSvc, tasksSvc)
+
+	// Telegram bot.
+	var telegramHandler *telegram.Handler
+	if cfg.TelegramBotToken != "" {
+		telegramRepo := telegram.NewRepository(pool)
+		telegramSvc := telegram.NewService(telegramRepo, tasksSvc, cfg.TelegramBotToken)
+		telegramHandler = telegram.NewHandler(telegramSvc)
+		go telegramSvc.StartPolling(schedulerCtx)
+		log.Println("Telegram bot polling started")
+	}
 
 	handler := server.New(server.ServerConfig{
 		JWTSecret:  cfg.JWTSecret,
@@ -301,7 +318,7 @@ func run() error {
 		webhooksHandler, githubHandler, sharingHandler, pomodoroHandler,
 		groqHandler, apiTokensSvc, webpushHandler, notesHandler, searchHandler,
 		habitsHandler, dashboardHandler, goalsHandler, remindersHandler,
-		automationsHandler, inboxHandler, calendarSyncHandler,
+		automationsHandler, inboxHandler, calendarSyncHandler, telegramHandler,
 	)
 
 	srv := &http.Server{

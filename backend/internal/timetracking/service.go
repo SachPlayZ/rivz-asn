@@ -69,3 +69,11 @@ func (s *Service) TotalSeconds(ctx context.Context, taskID string) (int, error) 
 	}
 	return total, nil
 }
+
+// AddManualEntry records a pre-computed completed time entry (e.g. from a Pomodoro session).
+func (s *Service) AddManualEntry(ctx context.Context, taskID, userID string, durationSeconds int, note string) error {
+	if err := s.repo.AddManualEntry(ctx, taskID, userID, durationSeconds, note); err != nil {
+		return fmt.Errorf("timetracking.service.add_manual: %w", err)
+	}
+	return nil
+}

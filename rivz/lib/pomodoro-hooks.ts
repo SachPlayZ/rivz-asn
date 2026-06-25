@@ -42,9 +42,14 @@ export function useCompletePomodoro() {
   return useMutation({
     mutationFn: (id: string) =>
       api.post<PomodoroSession>(`/pomodoro/${id}/complete`, {}),
-    onSuccess: () => {
+    onSuccess: (session) => {
       qc.invalidateQueries({ queryKey: ["pomodoro", "active"] });
       qc.invalidateQueries({ queryKey: ["pomodoro", "history"] });
+      // Invalidate task queries so total_time_seconds updates immediately.
+      if (session.task_id) {
+        qc.invalidateQueries({ queryKey: ["tasks"] });
+        qc.invalidateQueries({ queryKey: ["task", session.task_id] });
+      }
     },
   });
 }

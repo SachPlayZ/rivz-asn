@@ -59,7 +59,7 @@ func (s *Service) deliver(n *Notification) {
 
 	if prefs.Email && s.email != nil && prefs.UserMail != "" {
 		if err := s.email.SendNotification(prefs.UserMail, titleFor(n.Type), n.Message, url); err != nil {
-			log.Printf("notifications: email deliver: %v", err)
+			log.Printf("notifications: email deliver notif=%s type=%s user=%s: %v", n.ID, n.Type, n.UserID, err)
 		}
 	}
 
@@ -90,6 +90,8 @@ func titleFor(nType string) string {
 		return "Task assigned to you"
 	case "reminder":
 		return "Reminder"
+	case "automation":
+		return "Automation Triggered"
 	default:
 		return "Notification"
 	}

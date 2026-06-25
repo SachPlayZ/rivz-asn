@@ -14,6 +14,8 @@ type Repository interface {
 	Delete(ctx context.Context, id, userID string) error
 	ActiveEntry(ctx context.Context, taskID, userID string) (*TimeEntry, error)
 	TotalSeconds(ctx context.Context, taskID string) (int, error)
+	// AddManualEntry inserts a pre-computed completed time entry (e.g. from a Pomodoro session).
+	AddManualEntry(ctx context.Context, taskID, userID string, durationSeconds int, note string) error
 }
 
 type pgRepository struct {
@@ -112,4 +114,16 @@ func (r *pgRepository) TotalSeconds(ctx context.Context, taskID string) (int, er
 		return 0, fmt.Errorf("timetracking.total: %w", err)
 	}
 	return total, nil
+}
+
+// AddManualEntry inserts a completed time entry without an active start/stop flow.
+// ended_at is now(); started_at is computed by subtracting durationSeconds.
+func (r *pgRepository) AddManualEntry(ctx context.Context, taskID, userID string, durationSeconds int, note string) error {
+	const q = `INSERT INTO time_entries (task_id, user_id, started_at, ended_at, duration_seconds, note)
+		VALUES ($1, $2, now() - ($3::int * interval '1 second'), now(), $3, $4)`
+	_, err := r.pool.Exec(ctx, q, taskID, userID, durationSeconds, note)
+	if err != nil {
+		return fmt.Errorf("timetracking.add_manual: %w", err)
+	}
+	return nil
 }

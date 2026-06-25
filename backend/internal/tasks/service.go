@@ -151,7 +151,7 @@ func (s *Service) CreateTask(ctx context.Context, userID string, req CreateReque
 	}
 
 	if s.automationEng != nil {
-		go s.automationEng.OnTaskEvent(context.Background(), userID, task.ID, "created", task.Title, task.Status, task.Priority)
+		s.automationEng.OnTaskEvent(context.Background(), userID, task.ID, "created", task.Title, task.Status, task.Priority)
 	}
 
 	if s.calendarSyncSvc != nil {
@@ -246,7 +246,7 @@ func (s *Service) UpdateTask(ctx context.Context, id, userID string, req UpdateR
 		if req.Status != nil && (old.Status != *req.Status) {
 			event = "status_changed"
 		}
-		go s.automationEng.OnTaskEvent(context.Background(), userID, task.ID, event, task.Title, task.Status, task.Priority)
+		s.automationEng.OnTaskEvent(context.Background(), userID, task.ID, event, task.Title, task.Status, task.Priority)
 	}
 
 	if s.calendarSyncSvc != nil {
@@ -333,18 +333,39 @@ func advanceDueDate(due *time.Time, recurrence string) *time.Time {
 	if due == nil {
 		return nil
 	}
+	base := *due
+	now := time.Now().UTC().Truncate(24 * time.Hour)
+	// If the due date is in the past, advance from today so the new instance
+	// appears with a future due date rather than an already-overdue one.
+	if base.Before(now) {
+		base = now
+	}
 	var next time.Time
 	switch recurrence {
 	case "daily":
-		next = due.AddDate(0, 0, 1)
+		next = base.AddDate(0, 0, 1)
 	case "weekly":
-		next = due.AddDate(0, 0, 7)
+		next = base.AddDate(0, 0, 7)
 	case "monthly":
-		next = due.AddDate(0, 1, 0)
+		next = base.AddDate(0, 1, 0)
 	default:
 		return nil
 	}
 	return &next
+}
+
+// SpawnMissedRecurrences is called by the scheduler to create new instances for
+// completed recurring tasks that never had their next instance spawned
+// (e.g. server was down when the task was marked done).
+func (s *Service) SpawnMissedRecurrences(ctx context.Context) error {
+	tasks, err := s.repo.ListDoneRecurringWithoutChild(ctx)
+	if err != nil {
+		return fmt.Errorf("service: list done recurring: %w", err)
+	}
+	for _, t := range tasks {
+		s.spawnRecurrence(ctx, t)
+	}
+	return nil
 }
 
 // buildChanges computes a map of changed fields from old task and update request.

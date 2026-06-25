@@ -32,6 +32,9 @@ type Repository interface {
 	ListForAI(ctx context.Context, userID string) ([]*AITaskSummary, error)
 	UpdateStatusByID(ctx context.Context, taskID, status string) error
 	ListAllWithDueDate(ctx context.Context, userID string) ([]*Task, error)
+	// ListDoneRecurringWithoutChild returns completed recurring tasks that
+	// have no child task yet — used by the scheduler for missed-recurrence catchup.
+	ListDoneRecurringWithoutChild(ctx context.Context) ([]*Task, error)
 }
 
 // sortColumns is the whitelist of columns allowed in ORDER BY clauses.
@@ -557,4 +560,39 @@ func (r *pgRepository) CloneForRecurrence(ctx context.Context, original *Task) (
 		return nil, fmt.Errorf("tasks: clone: %w", err)
 	}
 	return r.GetTask(ctx, id, original.UserID)
+}
+
+// ListDoneRecurringWithoutChild returns completed recurring tasks that have no
+// child task yet. Used by the scheduler to catch up on missed recurrences.
+func (r *pgRepository) ListDoneRecurringWithoutChild(ctx context.Context) ([]*Task, error) {
+	q := fmt.Sprintf(`SELECT %s
+		FROM tasks t
+		LEFT JOIN users a ON a.id=t.assignee_id
+		LEFT JOIN projects p ON p.id=t.project_id
+		WHERE t.status = 'done'
+		  AND t.recurrence IS NOT NULL
+		  AND t.recurrence != ''
+		  AND NOT EXISTS (
+		    SELECT 1 FROM tasks child WHERE child.parent_task_id = t.id
+		  )`, taskSelect)
+	rows, err := r.pool.Query(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("tasks: list done recurring: %w", err)
+	}
+	defer rows.Close()
+	var result []*Task
+	for rows.Next() {
+		t := &Task{}
+		if err := rows.Scan(
+			&t.ID, &t.UserID, &t.Title, &t.Description, &t.Status, &t.Priority,
+			&t.DueDate, &t.Recurrence, &t.RecurrenceEnd, &t.ParentTaskID, &t.AssigneeID,
+			&t.AssigneeEmail, &t.ExternalEventID, &t.SortOrder, &t.EffortPoints, &t.ProjectID,
+			&t.ProjectName, &t.CreatedAt, &t.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("tasks: list done recurring scan: %w", err)
+		}
+		t.Tags = []Tag{}
+		result = append(result, t)
+	}
+	return result, rows.Err()
 }

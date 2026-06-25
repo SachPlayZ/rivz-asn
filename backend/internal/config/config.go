@@ -4,6 +4,7 @@ package config
 import (
 	"errors"
 	"os"
+	"strings"
 )
 
 // Config holds all application configuration values.
@@ -34,6 +35,8 @@ type Config struct {
 	VAPIDPublicKey      string
 	VAPIDPrivateKey     string
 	VAPIDSubject        string
+	TelegramBotToken    string
+	InboxDomain         string
 }
 
 // Load reads configuration from environment variables.
@@ -91,6 +94,14 @@ func Load() (*Config, error) {
 		vapidSubject = "mailto:" + resendFrom
 	}
 
+	inboxDomain := os.Getenv("INBOX_DOMAIN")
+	if inboxDomain == "" {
+		// Default: extract domain from RESEND_FROM (e.g. "noreply@fayde.app" → "fayde.app").
+		if parts := strings.SplitN(resendFrom, "@", 2); len(parts) == 2 {
+			inboxDomain = parts[1]
+		}
+	}
+
 	return &Config{
 		DatabaseURL:         dbURL,
 		JWTSecret:           jwtSecret,
@@ -118,5 +129,7 @@ func Load() (*Config, error) {
 		VAPIDPublicKey:      os.Getenv("VAPID_PUBLIC_KEY"),
 		VAPIDPrivateKey:     os.Getenv("VAPID_PRIVATE_KEY"),
 		VAPIDSubject:        vapidSubject,
+		TelegramBotToken:    os.Getenv("TELEGRAM_BOT_TOKEN"),
+		InboxDomain:         inboxDomain,
 	}, nil
 }

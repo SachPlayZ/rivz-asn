@@ -2,7 +2,10 @@
 package email
 
 import (
+	"crypto/tls"
 	"fmt"
+	"log"
+	"net"
 	"net/smtp"
 )
 
@@ -24,6 +27,17 @@ func New(host, port, user, pass, from string) *Client {
 		pass: pass,
 		from: from,
 	}
+}
+
+// Ping verifies SMTP connectivity and authentication at startup.
+// Returns an error if connection fails; the caller decides whether to fatal or warn.
+func (c *Client) Ping() error {
+	cl, err := c.dial()
+	if err != nil {
+		return fmt.Errorf("email.Ping: %w", err)
+	}
+	cl.Quit() //nolint:errcheck
+	return nil
 }
 
 // SendVerification sends an email verification link to the given address.
@@ -73,13 +87,89 @@ func (c *Client) SendNotification(to, title, body, url string) error {
 	return c.send(to, title, html)
 }
 
-func (c *Client) send(to, subject, html string) error {
-	var auth smtp.Auth
-	if c.user != "" {
-		auth = smtp.PlainAuth("", c.user, c.pass, c.host)
+// dial opens an SMTP connection with STARTTLS and authenticates.
+// This replaces smtp.SendMail to work correctly with Gmail and providers
+// that require explicit TLS on the connection after EHLO.
+func (c *Client) dial() (*smtp.Client, error) {
+	addr := net.JoinHostPort(c.host, c.port)
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		return nil, fmt.Errorf("dial tcp %s: %w", addr, err)
 	}
-	msg := fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=utf-8\r\n\r\n%s",
-		c.from, to, subject, html)
-	addr := fmt.Sprintf("%s:%s", c.host, c.port)
-	return smtp.SendMail(addr, auth, c.from, []string{to}, []byte(msg))
+
+	cl, err := smtp.NewClient(conn, c.host)
+	if err != nil {
+		conn.Close()
+		return nil, fmt.Errorf("smtp new client: %w", err)
+	}
+
+	// Upgrade to TLS (STARTTLS). Using InsecureSkipVerify=false ensures the
+	// server certificate is validated. ServerName must match the SMTP host
+	// (e.g. "smtp.gmail.com") — this is the key fix over PlainAuth which
+	// uses the host parameter only for credential-sending checks, not TLS SNI.
+	tlsCfg := &tls.Config{
+		ServerName: c.host,
+		MinVersion: tls.VersionTLS12,
+	}
+	if ok, _ := cl.Extension("STARTTLS"); ok {
+		if err := cl.StartTLS(tlsCfg); err != nil {
+			cl.Close()
+			return nil, fmt.Errorf("starttls: %w", err)
+		}
+	}
+
+	if c.user != "" {
+		auth := smtp.PlainAuth("", c.user, c.pass, c.host)
+		if err := cl.Auth(auth); err != nil {
+			cl.Close()
+			return nil, fmt.Errorf("smtp auth: %w", err)
+		}
+	}
+
+	return cl, nil
+}
+
+func (c *Client) send(to, subject, html string) (retErr error) {
+	const maxRetries = 2
+	var lastErr error
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		lastErr = c.sendOnce(to, subject, html)
+		if lastErr == nil {
+			return nil
+		}
+		log.Printf("email: send attempt %d failed: %v", attempt+1, lastErr)
+	}
+	return fmt.Errorf("email: send failed after %d attempts: %w", maxRetries, lastErr)
+}
+
+func (c *Client) sendOnce(to, subject, html string) error {
+	cl, err := c.dial()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		cl.Quit() //nolint:errcheck
+	}()
+
+	if err := cl.Mail(c.from); err != nil {
+		return fmt.Errorf("MAIL FROM: %w", err)
+	}
+	if err := cl.Rcpt(to); err != nil {
+		return fmt.Errorf("RCPT TO: %w", err)
+	}
+
+	w, err := cl.Data()
+	if err != nil {
+		return fmt.Errorf("DATA: %w", err)
+	}
+
+	msg := fmt.Sprintf(
+		"From: %s\r\nTo: %s\r\nSubject: %s\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=utf-8\r\n\r\n%s",
+		c.from, to, subject, html,
+	)
+	if _, err := fmt.Fprint(w, msg); err != nil {
+		w.Close()
+		return fmt.Errorf("write message: %w", err)
+	}
+	return w.Close()
 }
