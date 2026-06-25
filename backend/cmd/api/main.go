@@ -286,9 +286,10 @@ func run() error {
 	notifSvc.SetDeliverers(emailClient, webpushSvc, cfg.FrontendURL)
 
 	// Groq AI.
+	var groqClient *groq.Client
 	var groqHandler *groq.Handler
 	if cfg.GroqAPIKey != "" {
-		groqClient := groq.NewClient(cfg.GroqAPIKey)
+		groqClient = groq.NewClient(cfg.GroqAPIKey)
 		groqHandler = groq.NewHandler(groqClient, tasksSvc)
 	}
 
@@ -301,7 +302,7 @@ func run() error {
 	var telegramHandler *telegram.Handler
 	if cfg.TelegramBotToken != "" {
 		telegramRepo := telegram.NewRepository(pool)
-		telegramSvc := telegram.NewService(telegramRepo, tasksSvc, cfg.TelegramBotToken)
+		telegramSvc := telegram.NewService(telegramRepo, tasksSvc, cfg.TelegramBotToken, groqClient)
 		telegramHandler = telegram.NewHandler(telegramSvc)
 		go telegramSvc.StartPolling(schedulerCtx)
 		log.Println("Telegram bot polling started")

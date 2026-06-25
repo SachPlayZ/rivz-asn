@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/SachPlayZ/rivz-asn/backend/internal/groq"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/tasks"
 )
 
@@ -24,10 +25,11 @@ type TaskCreator interface {
 
 // Service manages the Telegram bot lifecycle and message handling.
 type Service struct {
-	repo     Repository
-	tasksSvc TaskCreator
-	token    string
-	botName  string
+	repo       Repository
+	tasksSvc   TaskCreator
+	token      string
+	botName    string
+	groqClient *groq.Client
 
 	mu        sync.Mutex
 	authCodes map[string]authCodeEntry // code → {userID, expiresAt}
@@ -39,12 +41,13 @@ type authCodeEntry struct {
 }
 
 // NewService creates a Telegram Service.
-func NewService(repo Repository, tasksSvc TaskCreator, botToken string) *Service {
+func NewService(repo Repository, tasksSvc TaskCreator, botToken string, groqClient *groq.Client) *Service {
 	return &Service{
-		repo:      repo,
-		tasksSvc:  tasksSvc,
-		token:     botToken,
-		authCodes: make(map[string]authCodeEntry),
+		repo:       repo,
+		tasksSvc:   tasksSvc,
+		token:      botToken,
+		groqClient: groqClient,
+		authCodes:  make(map[string]authCodeEntry),
 	}
 }
 
@@ -126,15 +129,110 @@ func (s *Service) HandleMessage(ctx context.Context, chatID int64, username, tex
 		return
 	}
 
-	task, err := s.tasksSvc.CreateTask(ctx, userID, tasks.CreateRequest{
-		Title: text,
-	})
+	var req tasks.CreateRequest
+	isAI := false
+	if s.groqClient != nil {
+		req = s.parseWithAI(ctx, text)
+		isAI = true
+	} else {
+		req = tasks.CreateRequest{
+			Title: text,
+		}
+	}
+
+	task, err := s.tasksSvc.CreateTask(ctx, userID, req)
 	if err != nil {
 		log.Printf("telegram: create task for user %s: %v", userID, err)
 		s.sendMessage(chatID, "❌ Failed to create task. Please try again.")
 		return
 	}
-	s.sendMessage(chatID, fmt.Sprintf("✅ Task created: *%s*", task.Title))
+
+	msg := fmt.Sprintf("✅ Task created: *%s*", task.Title)
+	if isAI {
+		var details []string
+		if task.Description != "" {
+			details = append(details, fmt.Sprintf("📝 *Desc*: %s", task.Description))
+		}
+		if task.Priority != "" {
+			details = append(details, fmt.Sprintf("⚡ *Priority*: %s", task.Priority))
+		}
+		if task.EffortPoints != nil {
+			details = append(details, fmt.Sprintf("🔢 *Difficulty (Effort)*: %d", *task.EffortPoints))
+		}
+		if task.DueDate != nil {
+			details = append(details, fmt.Sprintf("📅 *Due*: %s", task.DueDate.Format("2006-01-02")))
+		}
+		if len(details) > 0 {
+			msg += "\n" + strings.Join(details, "\n")
+		}
+	}
+	s.sendMessage(chatID, msg)
+}
+
+type parsedTask struct {
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	Priority     string `json:"priority"`
+	DueDate      string `json:"due_date"`
+	EffortPoints *int   `json:"effort_points"`
+}
+
+func (s *Service) parseWithAI(ctx context.Context, text string) tasks.CreateRequest {
+	todayStr := time.Now().Format("2006-01-02")
+	systemPrompt := fmt.Sprintf(`You are an agentic task planner. Process natural language task input.
+Extract task details.
+If the text implies a specific task title, extract/rephrase a concise title.
+If it contains more context, set it as description.
+If it implies a due date, output it in YYYY-MM-DD format (today is %s).
+If you can estimate the difficulty/effort (on a scale of 1 to 10), set effort_points (integer).
+If you can figure out priority, set priority ("low"|"medium"|"high").
+Respond with ONLY valid JSON. Do not wrap the JSON in markdown code blocks:
+{
+  "title": "concise title",
+  "description": "contextual details or rephrased instructions",
+  "priority": "low"|"medium"|"high"|null,
+  "due_date": "YYYY-MM-DD"|null,
+  "effort_points": int|null
+}`, todayStr)
+
+	content, err := s.groqClient.Chat(ctx, []groq.Message{
+		{Role: "system", Content: systemPrompt},
+		{Role: "user", Content: text},
+	})
+	if err != nil {
+		log.Printf("telegram: AI parse failed: %v", err)
+		return tasks.CreateRequest{Title: text}
+	}
+
+	content = strings.TrimPrefix(content, "```json")
+	content = strings.TrimPrefix(content, "```")
+	content = strings.TrimSuffix(content, "```")
+	content = strings.TrimSpace(content)
+
+	var p parsedTask
+	if err := json.Unmarshal([]byte(content), &p); err != nil {
+		log.Printf("telegram: unmarshal AI response failed: %v, content: %q", err, content)
+		return tasks.CreateRequest{Title: text}
+	}
+
+	if p.Title == "" {
+		p.Title = text
+	}
+
+	req := tasks.CreateRequest{
+		Title:        p.Title,
+		Description:  p.Description,
+		Priority:     p.Priority,
+		EffortPoints: p.EffortPoints,
+	}
+
+	if p.DueDate != "" {
+		if t, err := time.Parse("2006-01-02", p.DueDate); err == nil {
+			req.DueDate = &t
+		}
+	}
+
+	return req
 }
 
 // StartPolling begins long-polling the Telegram Bot API for updates.
