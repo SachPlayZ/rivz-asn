@@ -22,6 +22,10 @@ function TaskDetailSkeleton() {
   );
 }
 
+export async function generateStaticParams() {
+  return [{ id: "placeholder" }];
+}
+
 export default async function TaskDetailPage({
   params,
 }: {

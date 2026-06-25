@@ -44,6 +44,27 @@ export default function SignupPage() {
     resolver: zodResolver(signupSchema),
   });
 
+  const handleOAuth = async (provider: "google" | "github") => {
+    const isTauri =
+      typeof window !== "undefined" &&
+      (window as any).__TAURI_INTERNALS__ !== undefined;
+    const url = isTauri
+      ? `${BASE_URL}/auth/${provider}?platform=desktop`
+      : `${BASE_URL}/auth/${provider}`;
+
+    if (isTauri) {
+      try {
+        const { openUrl } = await import("@tauri-apps/plugin-opener");
+        await openUrl(url);
+      } catch (err) {
+        console.error("Tauri opener failed", err);
+        window.location.href = url;
+      }
+    } else {
+      window.location.href = url;
+    }
+  };
+
   const onSubmit = async (data: SignupInput) => {
     try {
       await api.post("/auth/signup", data);
@@ -80,7 +101,7 @@ export default function SignupPage() {
               type="button"
               variant="outline"
               className="w-full gap-2"
-              onClick={() => { window.location.href = `${BASE_URL}/auth/google`; }}
+              onClick={() => handleOAuth("google")}
             >
               <GoogleIcon />
               Continue with Google
@@ -89,7 +110,7 @@ export default function SignupPage() {
               type="button"
               variant="outline"
               className="w-full gap-2"
-              onClick={() => { window.location.href = `${BASE_URL}/auth/github`; }}
+              onClick={() => handleOAuth("github")}
             >
               <GitHubIcon />
               Continue with GitHub

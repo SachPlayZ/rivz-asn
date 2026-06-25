@@ -1,5 +1,5 @@
 "use client";
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, type LoginInput } from "@/lib/schemas";
@@ -45,10 +45,16 @@ export default function LoginPage() {
 }
 
 function LoginInner() {
-  const { login } = useAuth();
+  const { login, user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const oauthError = searchParams.get("error") === "oauth";
+
+  useEffect(() => {
+    if (user) {
+      router.replace("/tasks");
+    }
+  }, [user, router]);
 
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const { mutate: resend, isPending: resending } = useResendVerification();
@@ -111,6 +117,27 @@ function LoginInner() {
     });
   };
 
+  const handleOAuth = async (provider: "google" | "github") => {
+    const isTauri =
+      typeof window !== "undefined" &&
+      (window as any).__TAURI_INTERNALS__ !== undefined;
+    const url = isTauri
+      ? `${BASE_URL}/auth/${provider}?platform=desktop`
+      : `${BASE_URL}/auth/${provider}`;
+
+    if (isTauri) {
+      try {
+        const { openUrl } = await import("@tauri-apps/plugin-opener");
+        await openUrl(url);
+      } catch (err) {
+        console.error("Tauri opener failed", err);
+        window.location.href = url;
+      }
+    } else {
+      window.location.href = url;
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
@@ -133,7 +160,7 @@ function LoginInner() {
               type="button"
               variant="outline"
               className="w-full gap-2"
-              onClick={() => { window.location.href = `${BASE_URL}/auth/google`; }}
+              onClick={() => handleOAuth("google")}
             >
               <GoogleIcon />
               Continue with Google
@@ -142,7 +169,7 @@ function LoginInner() {
               type="button"
               variant="outline"
               className="w-full gap-2"
-              onClick={() => { window.location.href = `${BASE_URL}/auth/github`; }}
+              onClick={() => handleOAuth("github")}
             >
               <GitHubIcon />
               Continue with GitHub

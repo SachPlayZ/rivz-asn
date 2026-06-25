@@ -47,7 +47,11 @@ function OAuthCallbackInner() {
           display_name: user.display_name,
           avatar_url: user.avatar_url,
         });
-        router.replace("/tasks");
+        // Trigger the deep link callback for the desktop app
+        window.location.href = `fayde://auth/oauth-callback?token=${token}`;
+        setTimeout(() => {
+          router.replace("/tasks");
+        }, 1500);
       })
       .catch(() => router.replace("/login?error=oauth"));
   }, [params, router, login]);
