@@ -1,5 +1,4 @@
 "use client";
-import Link from "next/link";
 import Image from "next/image";
 import { motion, useReducedMotion, useAnimate } from "motion/react";
 import { useEffect, useState } from "react";
@@ -147,7 +146,7 @@ export function HeroSection() {
               transition={{ duration: 0.7, delay: 0.85, ease: [0.16, 1, 0.3, 1] }}
               className="flex flex-col gap-4 flex-shrink-0"
             >
-              <div className="flex items-center gap-5">
+              <div className="flex items-center">
                 <a
                   href={downloadLink.url}
                   className="bg-white text-black font-semibold px-7 py-3.5 rounded-full hover:bg-zinc-100 transition-all duration-200 active:scale-[0.97] text-sm whitespace-nowrap flex items-center gap-2 shadow-lg"
@@ -164,12 +163,6 @@ export function HeroSection() {
                   )}
                   {downloadLink.label}
                 </a>
-                <Link
-                  href="/signup"
-                  className="text-zinc-400 hover:text-white text-sm transition-colors duration-200 whitespace-nowrap"
-                >
-                  Use web version
-                </Link>
               </div>
               <div className="pl-1">
                 {downloadLink.os === "mac" ? (
