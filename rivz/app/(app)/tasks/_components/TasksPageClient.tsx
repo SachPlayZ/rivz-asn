@@ -33,10 +33,11 @@ import type { View as DisplayViewType } from "./ViewToggle";
 import {
   Plus, Search, ClipboardList, ArrowUp, ArrowDown, X,
   Inbox, Sun, Calendar, AlertCircle, CalendarClock, Focus,
-  CheckCircle2, ChevronRight,
+  CheckCircle2, ChevronRight, Filter,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useSavedFilters, useCreateSavedFilter, useDeleteSavedFilter, type SavedFilter } from "@/lib/savedfilters-hooks";
 import Link from "next/link";
 
 const PAGE_LIMIT = 10;
@@ -108,6 +109,40 @@ export function TasksPageClient() {
   const bulkUpdate = useBulkUpdateTasks();
   const updateTask = useUpdateTask();
   const bulkDelete = useBulkDeleteTasks();
+
+  // Saved Filters hooks
+  const { data: savedFilters = [] } = useSavedFilters();
+  const createSavedFilter = useCreateSavedFilter();
+  const deleteSavedFilter = useDeleteSavedFilter();
+
+  const handleSaveCurrentFilter = () => {
+    const namePrompt = prompt("Enter a name for this saved filter:", "My Filter");
+    if (!namePrompt?.trim()) return;
+
+    const params: Record<string, string> = {};
+    searchParams.forEach((value, key) => {
+      if (key !== "page" && key !== "new") {
+        params[key] = value;
+      }
+    });
+
+    createSavedFilter.mutate({
+      name: namePrompt.trim(),
+      params,
+    }, {
+      onSuccess: () => toast.success(`Saved filter "${namePrompt}"`),
+      onError: () => toast.error("Failed to save filter"),
+    });
+  };
+
+  const handleApplySavedFilter = (filter: SavedFilter) => {
+    const params = new URLSearchParams();
+    Object.entries(filter.params).forEach(([key, val]) => {
+      params.set(key, val);
+    });
+    router.push(`${pathname}?${params.toString()}`);
+    toast.success(`Applied filter "${filter.name}"`);
+  };
 
   if (prevSearch !== search) {
     setPrevSearch(search);
@@ -371,6 +406,47 @@ export function TasksPageClient() {
             Daily review
           </Link>
         </div>
+
+        <div className="mt-2 pt-2 border-t border-border flex flex-col gap-1">
+          <div className="flex items-center justify-between px-3 py-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80 flex items-center gap-1">
+              <Filter className="size-3" /> Filters
+            </span>
+            <button
+              onClick={handleSaveCurrentFilter}
+              className="text-muted-foreground hover:text-foreground text-[10px] font-bold leading-none shrink-0"
+              title="Save current active filter settings"
+            >
+              + Save
+            </button>
+          </div>
+          {savedFilters.length === 0 ? (
+            <p className="text-[10px] text-muted-foreground px-3 py-1 italic">None saved</p>
+          ) : (
+            savedFilters.map((sf) => (
+              <div key={sf.id} className="group flex items-center justify-between w-full rounded-lg hover:bg-muted/40 transition-colors pr-1.5">
+                <button
+                  onClick={() => handleApplySavedFilter(sf)}
+                  className="flex-1 text-left px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground truncate"
+                  title={`Apply filter "${sf.name}"`}
+                >
+                  {sf.name}
+                </button>
+                <button
+                  onClick={() => {
+                    deleteSavedFilter.mutate(sf.id, {
+                      onSuccess: () => toast.success("Saved filter deleted"),
+                    });
+                  }}
+                  className="size-5 flex items-center justify-center text-muted-foreground hover:text-destructive shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Delete this saved filter"
+                >
+                  <X className="size-3" />
+                </button>
+              </div>
+            ))
+          )}
+        </div>
       </aside>
 
       {/* Main content */}
@@ -524,7 +600,15 @@ export function TasksPageClient() {
           <WeeklyPlanner
             tasks={displayTasks}
             onTaskClick={(task) => router.push(`/tasks/${task.id}`)}
-            onUpdateDueDate={() => {}}
+            onUpdateDueDate={(taskId, date) => {
+              updateTask.mutate(
+                { id: taskId, due_date: new Date(date + "T12:00:00").toISOString() },
+                {
+                  onSuccess: () => toast.success("Rescheduled"),
+                  onError: () => toast.error("Failed to reschedule"),
+                }
+              );
+            }}
             onRangeChange={handleWeeklyRangeChange}
           />
         ) : displayView === "calendar" && list === "all" ? (

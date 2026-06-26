@@ -30,8 +30,13 @@ export function QuickCaptureProvider({ children }: { children: React.ReactNode }
         e.target instanceof HTMLTextAreaElement ||
         e.target instanceof HTMLSelectElement
       ) return;
-      // Cmd/Ctrl+N or bare N key
-      if (e.key === "n" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      // Option/Alt + N key
+      if (
+        (e.code === "KeyN" || e.key.toLowerCase() === "n" || e.key === "˜") &&
+        e.altKey &&
+        !e.metaKey &&
+        !e.ctrlKey
+      ) {
         e.preventDefault();
         setOpen(true);
       }

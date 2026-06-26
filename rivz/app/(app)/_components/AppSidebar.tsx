@@ -11,6 +11,7 @@ import {
   FolderKanban,
   Zap,
   FileText,
+  Brain,
   Settings,
   ShieldCheck,
   Activity,
@@ -54,6 +55,7 @@ const navMain = [
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/sprints", label: "Sprints", icon: Zap },
   { href: "/docs", label: "Docs", icon: FileText },
+  { href: "/focus", label: "Focus", icon: Brain },
 ];
 
 const navSecondary = [

@@ -11,6 +11,10 @@ import { useComments, useCreateComment, useUpdateComment, useDeleteComment } fro
 import { useTaskDependencies, useAddDependency, useRemoveDependency } from "@/lib/dependencies-hooks";
 import { useAdminUsers } from "@/lib/admin-hooks";
 import { useAuth } from "@/lib/auth-context";
+import { useShareToken, useCreateShareToken, useDeleteShareToken } from "@/lib/sharing-hooks";
+import { useWatchers, useWatchStatus, useAddWatcher, useRemoveWatcher } from "@/lib/watchers-hooks";
+import { useTimeEntries, useActiveTimeEntry, useStartTimer, useStopTimer, useDeleteTimeEntry, type TimeEntry } from "@/lib/timetracking-hooks";
+import { useCustomFieldDefs, useTaskFieldValues, useSetFieldValue } from "@/lib/customfields-hooks";
 import { ApiError } from "@/lib/api";
 import type { Task } from "@/lib/tasks-hooks";
 import { Button } from "@/components/ui/button";
@@ -74,6 +78,13 @@ import {
   Loader2,
   Check,
   Eye,
+  EyeOff,
+  Share2,
+  Globe,
+  Play,
+  Square,
+  History,
+  Sliders,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -188,6 +199,105 @@ function SidebarRow({ label, icon, children }: { label: string; icon?: React.Rea
   );
 }
 
+function useElapsedTimer(startedAt: string | undefined) {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    if (!startedAt) {
+      setElapsed(0);
+      return;
+    }
+    const calc = () => Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
+    setElapsed(calc());
+    const id = setInterval(() => setElapsed(calc()), 1000);
+    return () => clearInterval(id);
+  }, [startedAt]);
+
+  return elapsed;
+}
+
+function formatTimeTrackingSeconds(s: number) {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0)
+    return `${h}h ${String(m).padStart(2, "0")}m ${String(sec).padStart(2, "0")}s`;
+  return `${String(m).padStart(2, "0")}m ${String(sec).padStart(2, "0")}s`;
+}
+
+function ActiveTimeEntryTracker({ entry, onStop }: { entry: TimeEntry; onStop: (note: string) => void }) {
+  const elapsed = useElapsedTimer(entry.started_at);
+  const [stopNote, setStopNote] = useState(entry.note || "");
+
+  return (
+    <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-primary text-xs font-semibold">
+          <span className="relative flex size-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+            <span className="relative inline-flex rounded-full size-2 bg-primary" />
+          </span>
+          Timer Running
+        </div>
+        <span className="text-[10px] text-muted-foreground">
+          Started {format(new Date(entry.started_at), "h:mm a")}
+        </span>
+      </div>
+      <div className="text-center py-2">
+        <p className="font-mono text-3xl font-bold tracking-tight tabular-nums">
+          {formatTimeTrackingSeconds(elapsed)}
+        </p>
+      </div>
+      <div className="flex gap-2">
+        <Input
+          placeholder="Update description/note (optional)…"
+          value={stopNote}
+          onChange={(e) => setStopNote(e.target.value)}
+          className="h-8 text-xs flex-1 bg-background"
+        />
+        <Button
+          size="sm"
+          className="h-8 gap-1.5"
+          onClick={() => onStop(stopNote)}
+        >
+          <Square className="size-3.5 fill-current" />
+          Stop
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function StartTimeEntryTracker({ onStart, isPending }: { onStart: (note: string) => void; isPending: boolean }) {
+  const [startNote, setStartNote] = useState("");
+
+  return (
+    <div className="rounded-xl border border-border p-4 flex flex-col gap-3">
+      <p className="text-xs font-medium text-muted-foreground">Start logging time on this task</p>
+      <div className="flex gap-2">
+        <Input
+          placeholder="What are you working on? (optional)…"
+          value={startNote}
+          onChange={(e) => setStartNote(e.target.value)}
+          className="h-8 text-xs flex-1 bg-background"
+        />
+        <Button
+          size="sm"
+          className="h-8 gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
+          onClick={() => {
+            onStart(startNote);
+            setStartNote("");
+          }}
+          disabled={isPending}
+        >
+          <Play className="size-3.5 fill-current" />
+          Start Timer
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function TaskDetailClient({ id }: { id: string }) {
   const router = useRouter();
   const { user } = useAuth();
@@ -271,6 +381,33 @@ export function TaskDetailClient({ id }: { id: string }) {
   const { data: activityLogs = [], isLoading: activityLoading } = useTaskActivity(id, openedTabs.has("activity"));
 
   const { data: adminUsers = [] } = useAdminUsers(user?.role === "admin");
+
+  // Sharing hooks
+  const { data: shareToken } = useShareToken(id);
+  const createShareToken = useCreateShareToken();
+  const deleteShareToken = useDeleteShareToken();
+
+  // Watchers hooks
+  const { data: watchers = [] } = useWatchers(id);
+  const { data: watchStatus } = useWatchStatus(id);
+  const addWatcher = useAddWatcher();
+  const removeWatcher = useRemoveWatcher();
+
+  // Time tracking hooks
+  const { data: timeEntries = [] } = useTimeEntries(id, openedTabs.has("time_logs"));
+  const { data: activeTimeEntry } = useActiveTimeEntry(id);
+  const startTimer = useStartTimer();
+  const stopTimer = useStopTimer();
+  const deleteTimeEntry = useDeleteTimeEntry();
+
+  const totalDurationSeconds = useMemo(() => {
+    return timeEntries.reduce((sum, entry) => sum + (entry.duration_seconds ?? 0), 0);
+  }, [timeEntries]);
+
+  // Custom fields hooks
+  const { data: fieldDefs = [] } = useCustomFieldDefs();
+  const { data: fieldValues = [] } = useTaskFieldValues(id);
+  const setFieldValue = useSetFieldValue();
 
   // DnD for subtasks
   const sensors = useSensors(useSensor(PointerSensor));
@@ -606,6 +743,13 @@ export function TaskDetailClient({ id }: { id: string }) {
               <TabsTrigger value="activity" className="rounded-lg data-[state=active]:bg-muted data-[state=active]:shadow-none text-xs h-7 px-3">
                 Activity
               </TabsTrigger>
+              <TabsTrigger value="time_logs" className="rounded-lg data-[state=active]:bg-muted data-[state=active]:shadow-none text-xs h-7 px-3">
+                <Clock className="size-3 mr-1.5" />
+                Time Logs
+                {openedTabs.has("time_logs") && timeEntries.length > 0 && (
+                  <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium">{timeEntries.length}</span>
+                )}
+              </TabsTrigger>
             </TabsList>
 
             {/* Subtasks */}
@@ -868,6 +1012,73 @@ export function TaskDetailClient({ id }: { id: string }) {
                   })}
                 </ul>
               )}
+            </TabsContent>
+
+            {/* Time Logs */}
+            <TabsContent value="time_logs" className="mt-4 flex flex-col gap-3">
+              {activeTimeEntry ? (
+                <ActiveTimeEntryTracker
+                  entry={activeTimeEntry}
+                  onStop={(note) => {
+                    stopTimer.mutate(
+                      { taskId: id, entryId: activeTimeEntry.id, note },
+                      {
+                        onSuccess: () => toast.success("Timer stopped"),
+                        onError: () => toast.error("Failed to stop timer"),
+                      }
+                    );
+                  }}
+                />
+              ) : (
+                <StartTimeEntryTracker
+                  isPending={startTimer.isPending}
+                  onStart={(note) => {
+                    startTimer.mutate(
+                      { taskId: id, note },
+                      {
+                        onSuccess: () => toast.success("Timer started"),
+                        onError: () => toast.error("Failed to start timer"),
+                      }
+                    );
+                  }}
+                />
+              )}
+
+              <div className="rounded-xl border border-border bg-card overflow-hidden mt-4">
+                <div className="bg-muted/40 px-3 py-2 border-b border-border text-xs font-semibold flex items-center justify-between">
+                  <span>Log History</span>
+                  <span className="text-muted-foreground">Total: {formatTimeTrackingSeconds(totalDurationSeconds)}</span>
+                </div>
+                <div className="divide-y divide-border max-h-64 overflow-y-auto">
+                  {timeEntries.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-4 text-center">No time logged yet.</p>
+                  ) : (
+                    timeEntries.map((entry) => (
+                      <div key={entry.id} className="flex items-center justify-between px-3 py-2 hover:bg-muted/10">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium truncate">{entry.note || "Work session"}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {format(new Date(entry.started_at), "MMM d, yyyy h:mm a")} · {entry.duration_seconds ? formatTimeTrackingSeconds(entry.duration_seconds) : "—"}
+                          </p>
+                        </div>
+                        <Button
+                          size="icon-sm"
+                          variant="ghost"
+                          className="text-muted-foreground hover:text-destructive shrink-0 size-7"
+                          onClick={() => {
+                            deleteTimeEntry.mutate({ taskId: id, entryId: entry.id }, {
+                              onSuccess: () => toast.success("Time entry deleted"),
+                              onError: () => toast.error("Failed to delete time entry"),
+                            });
+                          }}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </TabsContent>
           </Tabs>
         </div>
@@ -1173,6 +1384,156 @@ export function TaskDetailClient({ id }: { id: string }) {
                 </div>
               </PopoverContent>
             </Popover>
+          </SidebarRow>
+
+          {/* Custom Fields */}
+          {fieldDefs.map((def) => {
+            const valObj = fieldValues.find((v) => v.field_id === def.id);
+            const currentVal = valObj ? valObj.value : "";
+            return (
+              <SidebarRow key={def.id} label={def.name} icon={<Sliders className="size-3" />}>
+                {def.field_type === "select" ? (
+                  <Select
+                    value={currentVal || "none"}
+                    onValueChange={(v) => {
+                      setFieldValue.mutate({ taskId: id, fieldId: def.id, value: v === "none" ? "" : v });
+                    }}
+                  >
+                    <SelectTrigger className="w-full h-8 text-sm bg-background">
+                      <SelectValue placeholder="Not set" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem value="none">Not set</SelectItem>
+                        {(def.options ?? []).map((opt) => (
+                          <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                ) : def.field_type === "date" ? (
+                  <Input
+                    type="date"
+                    value={currentVal}
+                    onChange={(e) => {
+                      setFieldValue.mutate({ taskId: id, fieldId: def.id, value: e.target.value });
+                    }}
+                    className="h-8 text-xs w-full bg-background"
+                  />
+                ) : (
+                  <Input
+                    type={def.field_type === "number" ? "number" : "text"}
+                    value={currentVal}
+                    onBlur={(e) => {
+                      if (e.target.value !== currentVal) {
+                        setFieldValue.mutate({ taskId: id, fieldId: def.id, value: e.target.value });
+                      }
+                    }}
+                    placeholder={`Enter ${def.name.toLowerCase()}…`}
+                    className="h-8 text-xs w-full bg-background"
+                  />
+                )}
+              </SidebarRow>
+            );
+          })}
+
+          {/* Watchers */}
+          <SidebarRow label="Watchers" icon={<Eye className="size-3" />}>
+            <div className="flex flex-col gap-1.5 w-full">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs w-full justify-center gap-1.5"
+                onClick={() => {
+                  if (watchStatus?.watching) {
+                    removeWatcher.mutate(id);
+                  } else {
+                    addWatcher.mutate(id);
+                  }
+                }}
+              >
+                {watchStatus?.watching ? (
+                  <>
+                    <EyeOff className="size-3 text-rose-500" />
+                    Unwatch task
+                  </>
+                ) : (
+                  <>
+                    <Eye className="size-3 text-primary" />
+                    Watch task
+                  </>
+                )}
+              </Button>
+              {watchers.length > 0 && (
+                <div className="text-[10px] text-muted-foreground flex flex-wrap gap-1 mt-1 pl-1">
+                  <span>Watching:</span>
+                  {watchers.map((w) => (
+                    <span key={w.user_id} className="underline" title={w.user_email}>
+                      {w.user_email.split("@")[0]}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </SidebarRow>
+
+          {/* Public Sharing */}
+          <SidebarRow label="Sharing" icon={<Share2 className="size-3" />}>
+            <div className="flex flex-col gap-1.5 w-full">
+              {shareToken ? (
+                <div className="flex flex-col gap-1 w-full">
+                  <div className="flex items-center gap-1">
+                    <Input
+                      readOnly
+                      value={`${window.location.origin}/share/${shareToken.token}`}
+                      className="h-7 text-[10px] font-mono select-all flex-1 bg-background"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/share/${shareToken.token}`);
+                        toast.success("Copied share link!");
+                      }}
+                    >
+                      Copy
+                    </Button>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-[10px] text-destructive hover:bg-destructive/10"
+                    onClick={() => {
+                      deleteShareToken.mutate(id, {
+                        onSuccess: () => toast.success("Revoked sharing link"),
+                        onError: () => toast.error("Failed to revoke link"),
+                      });
+                    }}
+                  >
+                    Revoke Share Link
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs w-full justify-center gap-1.5"
+                  onClick={() => {
+                    createShareToken.mutate(id, {
+                      onSuccess: () => toast.success("Share link created!"),
+                      onError: () => toast.error("Failed to create share link"),
+                    });
+                  }}
+                >
+                  <Globe className="size-3 text-primary" />
+                  Make public (share)
+                </Button>
+              )}
+            </div>
           </SidebarRow>
 
           {/* Timestamps */}

@@ -84,6 +84,8 @@ import {
   User,
   AlertTriangle,
   BellRing,
+  Sliders,
+  Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -91,6 +93,8 @@ import {
   useCreateReminder,
   useDeleteReminder,
 } from "@/lib/reminders-hooks";
+import { useTemplates, useCreateTemplate, useDeleteTemplate } from "@/lib/templates-hooks";
+import { useCustomFieldDefs, useTaskFieldValues, useSetFieldValue } from "@/lib/customfields-hooks";
 import { toast } from "sonner";
 
 type TaskFormProps = {
@@ -219,12 +223,38 @@ export function TaskForm({ open, onOpenChange, task, defaultDate }: TaskFormProp
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
 
+  // Templates
+  const { data: templates = [] } = useTemplates();
+  const createTemplate = useCreateTemplate();
+
+  // Custom Fields
+  const { data: fieldDefs = [] } = useCustomFieldDefs();
+  const { data: fieldValues = [] } = useTaskFieldValues(task?.id ?? "", !!task?.id);
+  const setFieldValue = useSetFieldValue();
+
+  // Local state for custom fields in creation/edit mode
+  const [localFieldValues, setLocalFieldValues] = useState<Record<string, string>>({});
+
+  // Sync edit values
+  useEffect(() => {
+    if (task && fieldValues.length > 0) {
+      const vals: Record<string, string> = {};
+      for (const val of fieldValues) {
+        vals[val.field_id] = val.value;
+      }
+      setLocalFieldValues(vals);
+    } else {
+      setLocalFieldValues({});
+    }
+  }, [task, fieldValues, open]);
+
   const {
     register,
     handleSubmit,
     setValue,
     control,
     reset,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<TaskInput>({
     resolver: zodResolver(taskSchema),
@@ -347,6 +377,38 @@ export function TaskForm({ open, onOpenChange, task, defaultDate }: TaskFormProp
     setCalendarOpen(false);
   };
 
+  const handleApplyTemplate = (templateId: string) => {
+    const tmpl = templates.find((t) => t.id === templateId);
+    if (!tmpl) return;
+    setValue("title", tmpl.title || "");
+    setValue("description", tmpl.description || "");
+    setValue("priority", (tmpl.priority as TaskInput["priority"]) || "medium");
+    setValue("status", (tmpl.status as TaskInput["status"]) || "todo");
+    toast.success(`Applied template "${tmpl.name}"`);
+  };
+
+  const handleSaveAsTemplate = () => {
+    const vals = getValues();
+    const titleVal = vals.title || "";
+    if (!titleVal.trim()) {
+      toast.error("Please enter a task title first to save as a template");
+      return;
+    }
+    const namePrompt = prompt("Enter a name for this template:", "New Template");
+    if (!namePrompt?.trim()) return;
+
+    createTemplate.mutate({
+      name: namePrompt.trim(),
+      title: titleVal,
+      description: vals.description || "",
+      priority: vals.priority || "medium",
+      status: vals.status || "todo",
+    }, {
+      onSuccess: () => toast.success(`Saved template "${namePrompt}"`),
+      onError: () => toast.error("Failed to save template"),
+    });
+  };
+
   const onSubmit = async (data: TaskInput) => {
     try {
       const payload = {
@@ -355,12 +417,23 @@ export function TaskForm({ open, onOpenChange, task, defaultDate }: TaskFormProp
         recurrence_end: data.recurrence_end ? `${data.recurrence_end}T00:00:00Z` : null,
         assignee_id: data.assignee_id || null,
       };
+      let resolvedTask: Task | null = null;
       if (isEdit && task) {
         await updateTask.mutateAsync({ id: task.id, ...payload });
+        resolvedTask = task;
         toast.success("Task updated");
       } else {
-        await createTask.mutateAsync(payload);
+        resolvedTask = await createTask.mutateAsync(payload);
         toast.success("Task created");
+      }
+
+      if (resolvedTask) {
+        for (const [fieldId, val] of Object.entries(localFieldValues)) {
+          const original = fieldValues.find((fv) => fv.field_id === fieldId)?.value ?? "";
+          if (val !== original) {
+            await setFieldValue.mutateAsync({ taskId: resolvedTask.id, fieldId, value: val });
+          }
+        }
       }
       handleClose();
     } catch (err) {
@@ -470,6 +543,40 @@ export function TaskForm({ open, onOpenChange, task, defaultDate }: TaskFormProp
             <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
               <AlertTriangle className="size-3.5 shrink-0" />
               This task is blocked by {deps?.blocked_by.length} task(s).
+            </div>
+          )}
+
+          {/* Templates Selection */}
+          {!isEdit && (
+            <div className="flex flex-col gap-1.5 rounded-lg border border-border bg-muted/20 p-3">
+              <Label className="text-xs font-semibold flex items-center gap-1.5 text-muted-foreground">
+                <Layers className="size-3.5 text-primary" /> Apply a Task Template
+              </Label>
+              <div className="flex gap-2 items-center">
+                <Select onValueChange={(val) => handleApplyTemplate(val)}>
+                  <SelectTrigger className="w-full text-xs h-8 bg-background flex-1">
+                    <SelectValue placeholder={templates.length > 0 ? "Select a template to pre-fill…" : "No templates saved yet"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {templates.map((tmpl) => (
+                        <SelectItem key={tmpl.id} value={tmpl.id} className="text-xs">
+                          {tmpl.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs shrink-0"
+                  onClick={handleSaveAsTemplate}
+                >
+                  Save Form as Template
+                </Button>
+              </div>
             </div>
           )}
 
@@ -652,6 +759,73 @@ export function TaskForm({ open, onOpenChange, task, defaultDate }: TaskFormProp
               </SelectContent>
             </Select>
           </div>
+
+          {/* Custom Fields */}
+          {fieldDefs.length > 0 && (
+            <div className="flex flex-col gap-2.5 rounded-lg border border-border p-3">
+              <Label className="text-xs font-semibold flex items-center gap-1.5 text-muted-foreground">
+                <Sliders className="size-3.5 text-primary" /> Custom Fields
+              </Label>
+              <div className="grid grid-cols-2 gap-3">
+                {fieldDefs.map((def) => {
+                  const currentVal = localFieldValues[def.id] ?? "";
+                  return (
+                    <div key={def.id} className="flex flex-col gap-1">
+                      <span className="text-xs font-medium text-muted-foreground">{def.name}</span>
+                      {def.field_type === "select" ? (
+                        <Select
+                          value={currentVal || "none"}
+                          onValueChange={(v) => {
+                            setLocalFieldValues((prev) => ({
+                              ...prev,
+                              [def.id]: v === "none" ? "" : v,
+                            }));
+                          }}
+                        >
+                          <SelectTrigger className="w-full h-8 text-xs bg-background">
+                            <SelectValue placeholder="Not set" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectItem value="none">Not set</SelectItem>
+                              {(def.options ?? []).map((opt) => (
+                                <SelectItem key={opt} value={opt} className="text-xs">{opt}</SelectItem>
+                              ))}
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      ) : def.field_type === "date" ? (
+                        <Input
+                          type="date"
+                          value={currentVal}
+                          onChange={(e) => {
+                            setLocalFieldValues((prev) => ({
+                              ...prev,
+                              [def.id]: e.target.value,
+                            }));
+                          }}
+                          className="h-8 text-xs w-full bg-background"
+                        />
+                      ) : (
+                        <Input
+                          type={def.field_type === "number" ? "number" : "text"}
+                          value={currentVal}
+                          onChange={(e) => {
+                            setLocalFieldValues((prev) => ({
+                              ...prev,
+                              [def.id]: e.target.value,
+                            }));
+                          }}
+                          placeholder={`Enter ${def.name.toLowerCase()}…`}
+                          className="h-8 text-xs w-full bg-background"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Tags — edit mode only */}
           {isEdit && (

@@ -24,6 +24,7 @@ import (
 	"github.com/SachPlayZ/rivz-asn/backend/internal/db"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/dependencies"
 	emailpkg "github.com/SachPlayZ/rivz-asn/backend/internal/email"
+	"github.com/SachPlayZ/rivz-asn/backend/internal/focusmode"
 	githubpkg "github.com/SachPlayZ/rivz-asn/backend/internal/github"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/goals"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/groq"
@@ -242,6 +243,11 @@ func run() error {
 	inboxRepo := inbox.NewRepository(pool)
 	inboxHandler := inbox.NewHandler(inboxRepo, tasksSvc, cfg.ResendAPIKey, cfg.InboxDomain)
 
+	// Focus mode.
+	focusmodeRepo := focusmode.NewRepository(pool)
+	focusmodeSvc := focusmode.NewService(focusmodeRepo)
+	focusmodeHandler := focusmode.NewHandler(focusmodeSvc)
+
 	// Automations engine.
 	automationsRepo := automations.NewRepository(pool)
 	automationsSvc := automations.NewService(automationsRepo, notifSvc)
@@ -319,7 +325,7 @@ func run() error {
 		webhooksHandler, githubHandler, sharingHandler, pomodoroHandler,
 		groqHandler, apiTokensSvc, webpushHandler, notesHandler, searchHandler,
 		habitsHandler, dashboardHandler, goalsHandler, remindersHandler,
-		automationsHandler, inboxHandler, calendarSyncHandler, telegramHandler,
+		automationsHandler, focusmodeHandler, inboxHandler, calendarSyncHandler, telegramHandler,
 	)
 
 	srv := &http.Server{

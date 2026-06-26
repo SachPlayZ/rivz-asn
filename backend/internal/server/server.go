@@ -14,6 +14,7 @@ import (
 	"github.com/SachPlayZ/rivz-asn/backend/internal/customfields"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/dashboard"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/dependencies"
+	"github.com/SachPlayZ/rivz-asn/backend/internal/focusmode"
 	githubpkg "github.com/SachPlayZ/rivz-asn/backend/internal/github"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/goals"
 	"github.com/SachPlayZ/rivz-asn/backend/internal/groq"
@@ -82,6 +83,7 @@ func New(
 	goalsHandler *goals.Handler,
 	remindersHandler *reminders.Handler,
 	automationsHandler *automations.Handler,
+	focusmodeHandler *focusmode.Handler,
 	inboxHandler *inbox.Handler,
 	calendarSyncHandler *calendarsync.Handler,
 	telegramHandler *telegram.Handler,
@@ -317,6 +319,16 @@ func New(
 		r.Post("/pomodoro/{id}/abandon", pomodoroHandler.Abandon)
 		r.Get("/pomodoro/history", pomodoroHandler.History)
 		r.Get("/pomodoro/active", pomodoroHandler.Active)
+
+		// Focus mode.
+		r.Post("/focus/start", focusmodeHandler.Start)
+		r.Post("/focus/end", focusmodeHandler.End)
+		r.Get("/focus/active", focusmodeHandler.Active)
+		r.Get("/focus/history", focusmodeHandler.History)
+		r.Get("/focus/stats", focusmodeHandler.Stats)
+		r.Get("/focus/{id}", focusmodeHandler.Get)
+		r.Patch("/focus/{id}", focusmodeHandler.Update)
+		r.Delete("/focus/{id}", focusmodeHandler.Delete)
 
 		// Settings.
 		r.Get("/calendar/status", calendarSyncHandler.Status)

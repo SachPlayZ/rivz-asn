@@ -15,7 +15,7 @@ const SHORTCUTS = [
   { group: "Global", keys: ["⌘", "K"], label: "Open command palette" },
   { group: "Global", keys: ["⌘", "B"], label: "Toggle sidebar" },
   { group: "Global", keys: ["⌘", "/"], label: "Keyboard shortcuts" },
-  { group: "Global", keys: ["N"], label: "Quick capture" },
+  { group: "Global", keys: ["⌥", "N"], label: "Quick capture" },
   { group: "Tasks page", keys: ["/"], label: "Focus search" },
   { group: "Tasks page", keys: ["Esc"], label: "Exit focus mode" },
 ];
@@ -90,7 +90,13 @@ export function CommandPaletteProvider({ children }: { children: React.ReactNode
         e.preventDefault();
         setShortcutsOpen((v) => !v);
       }
-      if (!inInput && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === "n") {
+      if (
+        !inInput &&
+        (e.code === "KeyN" || e.key.toLowerCase() === "n" || e.key === "˜") &&
+        e.altKey &&
+        !e.metaKey &&
+        !e.ctrlKey
+      ) {
         e.preventDefault();
         openCapture();
       }
