@@ -377,14 +377,16 @@ func (s *Service) getUpdates(ctx context.Context, offset int64, timeout int) ([]
 	defer resp.Body.Close()
 
 	var res struct {
-		OK     bool       `json:"ok"`
-		Result []tgUpdate `json:"result"`
+		OK          bool       `json:"ok"`
+		ErrorCode   int        `json:"error_code"`
+		Description string     `json:"description"`
+		Result      []tgUpdate `json:"result"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
 		return nil, err
 	}
 	if !res.OK {
-		return nil, fmt.Errorf("telegram getUpdates not ok")
+		return nil, fmt.Errorf("telegram getUpdates not ok: %d - %s", res.ErrorCode, res.Description)
 	}
 	return res.Result, nil
 }
