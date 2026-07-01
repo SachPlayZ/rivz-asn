@@ -38,33 +38,20 @@ jobs:
           # 1. Add VM IP to known hosts
           ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
 
-          # 2. Upload compiled binary to VM as a temp file
+          # 2. Upload compiled binary and service file to VM
           scp backend/server ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/ubuntu/server.tmp
+          scp backend/fayde-backend.service ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/home/ubuntu/fayde-backend.service.tmp
 
-          # 3. SSH into VM, setup systemd if missing, replace the binary, and restart service
+          # 3. SSH into VM, setup/update systemd, replace the binary, and restart service
           ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'EOF'
-            # Create systemd service file if it doesn't exist
-            if [ ! -f /etc/systemd/system/fayde-backend.service ]; then
-              echo "Creating systemd service file..."
-              sudo tee /etc/systemd/system/fayde-backend.service > /dev/null << 'SERVICE'
-[Unit]
-Description=Fayde Go Backend Service
-After=network.target
-
-[Service]
-Type=simple
-User=ubuntu
-WorkingDirectory=/home/ubuntu
-EnvironmentFile=/home/ubuntu/fayde-backend.env
-ExecStart=/home/ubuntu/server
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-SERVICE
+            # Update systemd service file if changed/missing
+            if [ ! -f /etc/systemd/system/fayde-backend.service ] || ! cmp -s /home/ubuntu/fayde-backend.service.tmp /etc/systemd/system/fayde-backend.service; then
+              echo "Updating systemd service file..."
+              sudo mv /home/ubuntu/fayde-backend.service.tmp /etc/systemd/system/fayde-backend.service
               sudo systemctl daemon-reload
               sudo systemctl enable fayde-backend
+            else
+              rm -f /home/ubuntu/fayde-backend.service.tmp
             fi
 
             echo "Stopping fayde-backend..."

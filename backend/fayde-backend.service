@@ -1,0 +1,15 @@
+[Unit]
+Description=Fayde Go Backend Service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu
+EnvironmentFile=/home/ubuntu/fayde-backend.env
+ExecStart=/home/ubuntu/server
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
